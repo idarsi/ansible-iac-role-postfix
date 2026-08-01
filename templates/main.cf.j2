@@ -1,0 +1,42 @@
+# Managed by Ansible. Manual changes may be overwritten.
+
+queue_directory = /var/spool/postfix
+command_directory = /usr/sbin
+daemon_directory = /usr/libexec/postfix
+data_directory = /var/lib/postfix
+mail_owner = postfix
+
+myhostname = {{ postfix_configuration.myhostname | default(ansible_facts.fqdn | default(inventory_hostname)) }}
+mydomain = {{ postfix_configuration.mydomain | default(ansible_facts.domain | default('localdomain', true)) }}
+myorigin = {{ postfix_configuration.myorigin | default('$mydomain') }}
+inet_interfaces = {{ postfix_configuration.inet_interfaces | default(postfix_default_inet_interfaces) }}
+inet_protocols = {{ postfix_configuration.inet_protocols | default(postfix_default_inet_protocols) }}
+
+mydestination = {{ postfix_configuration.mydestination | default(postfix_default_mydestination) | join(', ') }}
+mynetworks = {{ postfix_configuration.mynetworks | default(postfix_default_mynetworks) | join(', ') }}
+
+unknown_local_recipient_reject_code = 550
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+
+{% set virtual_domain_names = postfix_virtual_domains | map(attribute='name') | list %}
+{% set configured_virtual_domains = postfix_configuration.virtual_alias_domains | default(virtual_domain_names) %}
+{% set mailbox_domain_names = (postfix_virtual_domains | selectattr('mailboxes', 'defined') | map(attribute='name') | list) %}
+{% set configured_mailbox_domains = postfix_configuration.virtual_mailbox_domains | default(mailbox_domain_names) %}
+{% if configured_virtual_domains | length > 0 %}
+virtual_alias_domains = {{ configured_virtual_domains | join(', ') }}
+virtual_alias_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_alias_maps_path }}
+{% endif %}
+{% if configured_mailbox_domains | length > 0 %}
+virtual_mailbox_domains = {{ configured_mailbox_domains | join(', ') }}
+virtual_mailbox_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_mailbox_maps_path }}
+virtual_mailbox_base = {{ postfix_virtual_mailbox_base }}
+virtual_uid_maps = static:{{ postfix_vmail_user_uid }}
+virtual_gid_maps = static:{{ postfix_vmail_group_gid }}
+{% endif %}
+
+smtpd_recipient_restrictions = {{ postfix_configuration.smtpd_recipient_restrictions | default(postfix_default_smtpd_recipient_restrictions) | join(', ') }}
+
+{% for key, value in postfix_configuration.extra_parameters | default({}) | dictsort %}
+{{ key }} = {{ value }}
+{% endfor %}

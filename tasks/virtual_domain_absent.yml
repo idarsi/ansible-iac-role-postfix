@@ -1,0 +1,71 @@
+---
+###############################################################################
+#
+# virtual_domain_absent.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+- name: "Setting default virtual domain absent targets"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_domain_targets: "{{ postfix_virtual_domain_targets | default([]) }}"
+
+- name: "Falling back virtual domain absent target from virtual domain definitions"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_domain_targets:
+      - "{{ postfix_virtual_domains[-1] }}"
+  when:
+    - postfix_effective_virtual_domain_targets | length == 0
+    - postfix_virtual_domains | length > 0
+
+- name: "Checking virtual domain absent requirements"
+  ansible.builtin.assert:
+    that:
+      - postfix_effective_virtual_domain_targets | length > 0
+    fail_msg: "No virtual domain target found for virtual_domain_absent"
+
+- name: "Preparing Postfix map type"
+  ansible.builtin.include_tasks: map_type_prepare.yml
+
+- name: "Ensuring Postfix virtual domain alias entries are absent"
+  ansible.builtin.lineinfile:
+    path: "{{ postfix_virtual_alias_maps_path }}"
+    regexp: "^{{ item.1.source | regex_escape }}\\s+"
+    state: "absent"
+    create: true
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  loop: "{{ query('subelements', postfix_effective_virtual_domain_targets, 'aliases', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1.source }}"
+
+- name: "Ensuring Postfix virtual domain mailbox entries are absent"
+  ansible.builtin.lineinfile:
+    path: "{{ postfix_virtual_mailbox_maps_path }}"
+    regexp: "^{{ (item.1.user ~ '@' ~ item.0.name) | regex_escape }}\\s+"
+    state: "absent"
+    create: true
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  loop: "{{ query('subelements', postfix_effective_virtual_domain_targets, 'mailboxes', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1.user }}@{{ item.0.name }}"
+
+- name: "Ensuring virtual mailbox directories are absent for target domains"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}/{{ item.0.name }}/{{ item.1.user }}"
+    state: "absent"
+  loop: "{{ query('subelements', postfix_effective_virtual_domain_targets, 'mailboxes', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1.user }}@{{ item.0.name }}"
+
+- name: "Rebuilding Postfix maps after virtual domain absent"
+  ansible.builtin.include_tasks: maps_rebuild.yml
+
+- name: "Writing log"
+  ansible.builtin.include_tasks: log_write.yml
+  vars:
+    iac_log_write: "Ensured Postfix virtual domain targets were absent"

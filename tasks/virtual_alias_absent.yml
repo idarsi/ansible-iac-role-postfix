@@ -1,0 +1,53 @@
+---
+###############################################################################
+#
+# virtual_alias_absent.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+- name: "Setting default virtual alias absent targets"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_alias_targets: "{{ postfix_virtual_alias_targets | default([]) }}"
+
+- name: "Falling back virtual alias absent target from virtual domain definitions"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_alias_targets:
+      - source: "{{ postfix_virtual_domains[-1].aliases[-1].source }}"
+        destination: "{{ postfix_virtual_domains[-1].aliases[-1].destination }}"
+  when:
+    - postfix_effective_virtual_alias_targets | length == 0
+    - postfix_virtual_domains | length > 0
+    - postfix_virtual_domains[-1].aliases is defined
+    - postfix_virtual_domains[-1].aliases | length > 0
+
+- name: "Checking virtual alias absent requirements"
+  ansible.builtin.assert:
+    that:
+      - postfix_effective_virtual_alias_targets | length > 0
+    fail_msg: "No virtual alias target found for virtual_alias_absent"
+
+- name: "Preparing Postfix map type"
+  ansible.builtin.include_tasks: map_type_prepare.yml
+
+- name: "Ensuring Postfix virtual alias target entries are absent"
+  ansible.builtin.lineinfile:
+    path: "{{ postfix_virtual_alias_maps_path }}"
+    regexp: "^{{ item.source | regex_escape }}\\s+"
+    state: "absent"
+    create: true
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  loop: "{{ postfix_effective_virtual_alias_targets }}"
+  loop_control:
+    label: "{{ item.source }}"
+
+- name: "Rebuilding Postfix maps after virtual alias absent"
+  ansible.builtin.include_tasks: maps_rebuild.yml
+
+- name: "Writing log"
+  ansible.builtin.include_tasks: log_write.yml
+  vars:
+    iac_log_write: "Ensured Postfix virtual alias targets were absent"

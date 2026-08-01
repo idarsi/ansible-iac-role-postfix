@@ -1,0 +1,18 @@
+---
+###############################################################################
+#
+# install.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+###############################################################################
+# ENSURING POSTFIX INSTALLATION AND CONFIGURATION
+###############################################################################
+
+- name: "Ensuring Postfix installation is present"
+  ansible.builtin.include_tasks: present.yml
+
+- name: "Ensuring Postfix service is started"
+  ansible.builtin.include_tasks: started.yml

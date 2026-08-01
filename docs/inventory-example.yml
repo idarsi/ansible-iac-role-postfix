@@ -1,0 +1,35 @@
+---
+iac_blueprint:
+  postfix:
+    configuration:
+      myhostname: "mail.example.com"
+      mydomain: "example.com"
+      inet_interfaces: "all"
+      inet_protocols: "all"
+      mynetworks:
+        - "127.0.0.0/8"
+        - "[::1]/128"
+      extra_parameters:
+        smtpd_banner: "$myhostname ESMTP"
+    virtual_domains:
+      - name: "example.com"
+        mailboxes:
+          - user: "info"
+          - user: "sales"
+        aliases:
+          - source: "info@example.com"
+            destination: "info@example.com"
+          - source: "@example.com"
+            destination: "sales@example.com"
+      - name: "example.net"
+        mailboxes:
+          - user: "admin"
+        aliases:
+          - source: "admin@example.net"
+            destination: "admin@example.net"
+    virtual_aliases:
+      - source: "postmaster@example.com"
+        destination: "root"
+    virtual_mailboxes:
+      - address: "archive@example.com"
+        path: "example.com/archive/"

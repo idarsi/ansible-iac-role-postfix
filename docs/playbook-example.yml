@@ -1,0 +1,7 @@
+---
+- name: "Configure Postfix"
+  hosts: mail_servers
+  become: true
+  roles:
+    - role: ansible-iac-role-postfix
+      state: install

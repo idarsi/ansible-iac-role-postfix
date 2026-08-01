@@ -1,0 +1,10 @@
+# Managed by Ansible. Manual changes may be overwritten.
+
+{% for domain in postfix_virtual_domains %}
+{% for alias in domain.aliases | default([]) %}
+{{ alias.source }} {{ alias.destination }}
+{% endfor %}
+{% endfor %}
+{% for alias in postfix_virtual_aliases %}
+{{ alias.source }} {{ alias.destination }}
+{% endfor %}

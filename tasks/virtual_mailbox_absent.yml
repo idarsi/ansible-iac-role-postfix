@@ -1,0 +1,73 @@
+---
+###############################################################################
+#
+# virtual_mailbox_absent.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+- name: "Setting default virtual mailbox absent targets"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_mailbox_targets: "{{ postfix_virtual_mailbox_targets | default([]) }}"
+
+- name: "Falling back virtual mailbox absent target from virtual domain definitions"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_mailbox_targets:
+      - domain: "{{ postfix_virtual_domains[-1].name }}"
+        user: "{{ postfix_virtual_domains[-1].mailboxes[-1].user }}"
+  when:
+    - postfix_effective_virtual_mailbox_targets | length == 0
+    - postfix_virtual_domains | length > 0
+    - postfix_virtual_domains[-1].mailboxes is defined
+    - postfix_virtual_domains[-1].mailboxes | length > 0
+
+- name: "Checking virtual mailbox absent requirements"
+  ansible.builtin.assert:
+    that:
+      - postfix_effective_virtual_mailbox_targets | length > 0
+    fail_msg: "No virtual mailbox target found for virtual_mailbox_absent"
+
+- name: "Checking virtual mailbox target entries"
+  ansible.builtin.assert:
+    that:
+      - item.domain is defined
+      - item.user is defined
+      - item.domain | length > 0
+      - item.user | length > 0
+    fail_msg: "Each postfix.virtual_mailbox_targets entry must include domain and user"
+  loop: "{{ postfix_effective_virtual_mailbox_targets }}"
+  loop_control:
+    label: "{{ item.user | default('missing-user') }}@{{ item.domain | default('missing-domain') }}"
+
+- name: "Preparing Postfix map type"
+  ansible.builtin.include_tasks: map_type_prepare.yml
+
+- name: "Ensuring Postfix virtual mailbox target entries are absent"
+  ansible.builtin.lineinfile:
+    path: "{{ postfix_virtual_mailbox_maps_path }}"
+    regexp: "^{{ (item.user ~ '@' ~ item.domain) | regex_escape }}\\s+"
+    state: "absent"
+    create: true
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  loop: "{{ postfix_effective_virtual_mailbox_targets }}"
+  loop_control:
+    label: "{{ item.user }}@{{ item.domain }}"
+
+- name: "Ensuring virtual mailbox directories are absent for targets"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}/{{ item.domain }}/{{ item.user }}"
+    state: "absent"
+  loop: "{{ postfix_effective_virtual_mailbox_targets }}"
+  loop_control:
+    label: "{{ item.user }}@{{ item.domain }}"
+
+- name: "Rebuilding Postfix maps after virtual mailbox absent"
+  ansible.builtin.include_tasks: maps_rebuild.yml
+
+- name: "Writing log"
+  ansible.builtin.include_tasks: log_write.yml
+  vars:
+    iac_log_write: "Ensured Postfix virtual mailbox targets were absent"

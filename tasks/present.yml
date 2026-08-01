@@ -1,0 +1,24 @@
+---
+###############################################################################
+#
+# present.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+###############################################################################
+# ENSURING POSTFIX PACKAGE IS PRESENT
+###############################################################################
+
+- name: "Ensuring Postfix package is installed"
+  ansible.builtin.include_tasks: package_present.yml
+  vars:
+    iac_package: "{{ postfix_package }}"
+
+###############################################################################
+# ENSURING POSTFIX CONFIGURATION IS PRESENT
+###############################################################################
+
+- name: "Ensuring Postfix configuration is present"
+  ansible.builtin.include_tasks: configuration_present.yml

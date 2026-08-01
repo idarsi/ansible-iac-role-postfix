@@ -1,0 +1,113 @@
+---
+###############################################################################
+#
+# virtual_mailbox_present.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+- name: "Setting default virtual mailbox present targets"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_mailbox_targets: "{{ postfix_virtual_mailbox_targets | default([]) }}"
+
+- name: "Falling back virtual mailbox present target from virtual domain definitions"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_mailbox_targets:
+      - domain: "{{ postfix_virtual_domains[-1].name }}"
+        user: "{{ postfix_virtual_domains[-1].mailboxes[-1].user }}"
+  when:
+    - postfix_effective_virtual_mailbox_targets | length == 0
+    - postfix_virtual_domains | length > 0
+    - postfix_virtual_domains[-1].mailboxes is defined
+    - postfix_virtual_domains[-1].mailboxes | length > 0
+
+- name: "Checking virtual mailbox present requirements"
+  ansible.builtin.assert:
+    that:
+      - postfix_effective_virtual_mailbox_targets | length > 0
+    fail_msg: "No virtual mailbox target found for virtual_mailbox_present"
+
+- name: "Preparing Postfix map type"
+  ansible.builtin.include_tasks: map_type_prepare.yml
+
+- name: "Ensuring vmail group is present"
+  ansible.builtin.group:
+    name: "{{ postfix_vmail_group_name }}"
+    gid: "{{ postfix_vmail_group_gid }}"
+    system: true
+    state: "present"
+
+- name: "Ensuring vmail user is present"
+  ansible.builtin.user:
+    name: "{{ postfix_vmail_user_name }}"
+    uid: "{{ postfix_vmail_user_uid }}"
+    group: "{{ postfix_vmail_group_name }}"
+    home: "{{ postfix_virtual_mailbox_base }}"
+    create_home: false
+    shell: "/sbin/nologin"
+    system: true
+    state: "present"
+
+- name: "Ensuring virtual mailbox base directory is present"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}"
+    state: "directory"
+    owner: "{{ postfix_vmail_user_name }}"
+    group: "{{ postfix_vmail_group_name }}"
+    mode: "0750"
+
+- name: "Checking virtual mailbox target entries"
+  ansible.builtin.assert:
+    that:
+      - item.domain is defined
+      - item.user is defined
+      - item.domain | length > 0
+      - item.user | length > 0
+    fail_msg: "Each postfix.virtual_mailbox_targets entry must include domain and user"
+  loop: "{{ postfix_effective_virtual_mailbox_targets }}"
+  loop_control:
+    label: "{{ item.user | default('missing-user') }}@{{ item.domain | default('missing-domain') }}"
+
+- name: "Ensuring Postfix virtual mailbox target entries are present"
+  ansible.builtin.lineinfile:
+    path: "{{ postfix_virtual_mailbox_maps_path }}"
+    regexp: "^{{ (item.user ~ '@' ~ item.domain) | regex_escape }}\\s+"
+    line: "{{ item.user }}@{{ item.domain }} {{ item.domain }}/{{ item.user }}/"
+    create: true
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  loop: "{{ postfix_effective_virtual_mailbox_targets }}"
+  loop_control:
+    label: "{{ item.user }}@{{ item.domain }}"
+
+- name: "Ensuring virtual mailbox directories are present for targets"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}/{{ item.domain }}/{{ item.user }}"
+    state: "directory"
+    owner: "{{ postfix_vmail_user_name }}"
+    group: "{{ postfix_vmail_group_name }}"
+    mode: "0750"
+  loop: "{{ postfix_effective_virtual_mailbox_targets }}"
+  loop_control:
+    label: "{{ item.user }}@{{ item.domain }}"
+
+- name: "Ensuring virtual mailbox Maildir subdirectories are present for targets"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}/{{ item.0.domain }}/{{ item.0.user }}/{{ item.1 }}"
+    state: "directory"
+    owner: "{{ postfix_vmail_user_name }}"
+    group: "{{ postfix_vmail_group_name }}"
+    mode: "0750"
+  loop: "{{ postfix_effective_virtual_mailbox_targets | product(['new', 'cur', 'tmp']) | list }}"
+  loop_control:
+    label: "{{ item.0.user }}@{{ item.0.domain }}/{{ item.1 }}"
+
+- name: "Rebuilding Postfix maps after virtual mailbox present"
+  ansible.builtin.include_tasks: maps_rebuild.yml
+
+- name: "Writing log"
+  ansible.builtin.include_tasks: log_write.yml
+  vars:
+    iac_log_write: "Ensured Postfix virtual mailbox targets were present"

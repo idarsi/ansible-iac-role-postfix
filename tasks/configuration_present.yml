@@ -1,0 +1,229 @@
+---
+###############################################################################
+#
+# configuration_present.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+###############################################################################
+# CHECKING REQUIREMENTS
+###############################################################################
+
+- name: "Checking if required variables are defined"
+  ansible.builtin.assert:
+    that:
+      - postfix_configuration is defined
+      - postfix_virtual_domains is defined
+      - postfix_virtual_aliases is defined
+      - postfix_virtual_mailboxes is defined
+      - postfix_etc_directory is defined
+      - postfix_main_cf_path is defined
+      - postfix_virtual_alias_maps_path is defined
+      - postfix_virtual_mailbox_maps_path is defined
+      - postfix_virtual_alias_maps_type is defined
+      - postfix_virtual_mailbox_base is defined
+      - postfix_vmail_group_name is defined
+      - postfix_vmail_group_gid is defined
+      - postfix_vmail_user_name is defined
+      - postfix_vmail_user_uid is defined
+    fail_msg: "All tests did not pass"
+
+###############################################################################
+# ENSURING POSTFIX CONFIGURATION
+###############################################################################
+
+- name: "Ensuring Postfix configuration directory is present"
+  ansible.builtin.file:
+    path: "{{ postfix_etc_directory }}"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+
+- name: "Ensuring vmail group is present"
+  ansible.builtin.group:
+    name: "{{ postfix_vmail_group_name }}"
+    gid: "{{ postfix_vmail_group_gid }}"
+    system: true
+    state: "present"
+
+- name: "Ensuring vmail user is present"
+  ansible.builtin.user:
+    name: "{{ postfix_vmail_user_name }}"
+    uid: "{{ postfix_vmail_user_uid }}"
+    group: "{{ postfix_vmail_group_name }}"
+    home: "{{ postfix_virtual_mailbox_base }}"
+    create_home: false
+    shell: "/sbin/nologin"
+    system: true
+    state: "present"
+
+- name: "Ensuring Postfix virtual mailbox base directory is present"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}"
+    state: "directory"
+    owner: "{{ postfix_vmail_user_name }}"
+    group: "{{ postfix_vmail_group_name }}"
+    mode: "0750"
+
+- name: "Collecting supported Postfix map types"
+  ansible.builtin.command:
+    cmd: "postconf -m"
+  register: postfix_supported_map_types
+  changed_when: false
+  failed_when: postfix_supported_map_types.rc != 0
+
+- name: "Setting unsupported Postfix virtual alias map type fallback"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_alias_maps_type: "unsupported"
+
+- name: "Setting configured Postfix virtual alias map type"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_alias_maps_type: "{{ postfix_virtual_alias_maps_type }}"
+  when: postfix_virtual_alias_maps_type != 'auto'
+
+- name: "Setting hash Postfix virtual alias map type"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_alias_maps_type: "hash"
+  when:
+    - postfix_virtual_alias_maps_type == 'auto'
+    - "'hash' in postfix_supported_map_types.stdout_lines"
+
+- name: "Setting LMDB Postfix virtual alias map type"
+  ansible.builtin.set_fact:
+    postfix_effective_virtual_alias_maps_type: "lmdb"
+  when:
+    - postfix_virtual_alias_maps_type == 'auto'
+    - "'hash' not in postfix_supported_map_types.stdout_lines"
+    - "'lmdb' in postfix_supported_map_types.stdout_lines"
+
+- name: "Checking if Postfix virtual alias map type is supported"
+  ansible.builtin.assert:
+    that:
+      - postfix_effective_virtual_alias_maps_type != 'unsupported'
+      - postfix_effective_virtual_alias_maps_type in postfix_supported_map_types.stdout_lines
+    fail_msg: "No supported Postfix virtual alias map type found. Supported map types: {{ postfix_supported_map_types.stdout_lines | join(', ') }}"
+
+- name: "Ensuring Postfix main configuration is present"
+  ansible.builtin.template:
+    src: "main.cf.j2"
+    dest: "{{ postfix_main_cf_path }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: postfix_main_cf
+
+- name: "Checking Postfix virtual alias map database"
+  ansible.builtin.stat:
+    path: "{{ postfix_virtual_alias_maps_db_path if postfix_effective_virtual_alias_maps_type == 'hash' else postfix_virtual_alias_maps_lmdb_path }}"
+  register: postfix_virtual_alias_maps_db
+
+- name: "Ensuring Postfix virtual alias map is present"
+  ansible.builtin.template:
+    src: "virtual.j2"
+    dest: "{{ postfix_virtual_alias_maps_path }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: postfix_virtual_alias_map
+
+- name: "Checking Postfix virtual mailbox map database"
+  ansible.builtin.stat:
+    path: "{{ postfix_virtual_mailbox_maps_db_path if postfix_effective_virtual_alias_maps_type == 'hash' else postfix_virtual_mailbox_maps_lmdb_path }}"
+  register: postfix_virtual_mailbox_maps_db
+
+- name: "Ensuring Postfix virtual mailbox map is present"
+  ansible.builtin.template:
+    src: "vmailbox.j2"
+    dest: "{{ postfix_virtual_mailbox_maps_path }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: postfix_virtual_mailbox_map
+
+- name: "Checking virtual mailbox domain entries"
+  ansible.builtin.assert:
+    that:
+      - item.0.name is defined
+      - item.1.user is defined
+      - item.1.user | length > 0
+    fail_msg: "Each virtual mailbox entry must include domain name and mailbox user"
+  loop: "{{ query('subelements', postfix_virtual_domains, 'mailboxes', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ (item.1.user | default('missing-user')) ~ '@' ~ (item.0.name | default('missing-domain')) }}"
+
+- name: "Checking explicit virtual mailbox map entries"
+  ansible.builtin.assert:
+    that:
+      - item.address is defined
+      - item.address | length > 0
+      - item.path is defined
+      - item.path | length > 0
+    fail_msg: "Each postfix.virtual_mailboxes entry must include address and path"
+  loop: "{{ postfix_virtual_mailboxes }}"
+  loop_control:
+    label: "{{ item.address | default('missing-address') }}"
+
+- name: "Ensuring virtual mailbox directories are present"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}/{{ item.0.name }}/{{ item.1.user }}"
+    state: "directory"
+    owner: "{{ postfix_vmail_user_name }}"
+    group: "{{ postfix_vmail_group_name }}"
+    mode: "0750"
+  loop: "{{ query('subelements', postfix_virtual_domains, 'mailboxes', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1.user }}@{{ item.0.name }}"
+
+- name: "Ensuring virtual mailbox Maildir subdirectories are present"
+  ansible.builtin.file:
+    path: "{{ postfix_virtual_mailbox_base }}/{{ item.0.0.name }}/{{ item.0.1.user }}/{{ item.1 }}"
+    state: "directory"
+    owner: "{{ postfix_vmail_user_name }}"
+    group: "{{ postfix_vmail_group_name }}"
+    mode: "0750"
+  loop: "{{ query('subelements', postfix_virtual_domains, 'mailboxes', {'skip_missing': true}) | product(['new', 'cur', 'tmp']) | list }}"
+  loop_control:
+    label: "{{ item.0.1.user }}@{{ item.0.0.name }}/{{ item.1 }}"
+
+- name: "Ensuring Postfix virtual alias map database is present"
+  ansible.builtin.command:
+    cmd: "postmap {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_alias_maps_path }}"
+  register: postfix_postmap
+  changed_when: postfix_virtual_alias_map.changed or not postfix_virtual_alias_maps_db.stat.exists
+  failed_when: postfix_postmap.rc != 0
+  when: postfix_virtual_alias_map.changed or not postfix_virtual_alias_maps_db.stat.exists
+
+- name: "Ensuring Postfix virtual mailbox map database is present"
+  ansible.builtin.command:
+    cmd: "postmap {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_mailbox_maps_path }}"
+  register: postfix_mailbox_postmap
+  changed_when: postfix_virtual_mailbox_map.changed or not postfix_virtual_mailbox_maps_db.stat.exists
+  failed_when: postfix_mailbox_postmap.rc != 0
+  when: postfix_virtual_mailbox_map.changed or not postfix_virtual_mailbox_maps_db.stat.exists
+
+- name: "Checking Postfix configuration"
+  ansible.builtin.command:
+    cmd: "postfix check"
+  register: postfix_check
+  changed_when: false
+  failed_when: postfix_check.rc != 0
+
+- name: "Collecting service facts"
+  ansible.builtin.service_facts:
+
+- name: "Reloading Postfix when configuration changed"
+  ansible.builtin.systemd:
+    name: "{{ postfix_service_name }}"
+    state: "reloaded"
+  when:
+    - postfix_main_cf.changed or postfix_virtual_alias_map.changed or postfix_virtual_mailbox_map.changed
+    - ansible_facts.services[postfix_service_name ~ '.service'] is defined
+    - ansible_facts.services[postfix_service_name ~ '.service'].state == 'running'
+
+- name: "Writing log"
+  ansible.builtin.include_tasks: log_write.yml
+  vars:
+    iac_log_write: "Ensured Postfix configuration was present"

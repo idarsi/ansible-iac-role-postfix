@@ -1,0 +1,40 @@
+---
+###############################################################################
+#
+# maps_rebuild.yml
+#
+# @author Arsi Atomi
+#
+###############################################################################
+
+- name: "Ensuring Postfix virtual alias map database is present"
+  ansible.builtin.command:
+    cmd: "postmap {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_alias_maps_path }}"
+  register: postfix_postmap_alias
+  changed_when: true
+  failed_when: postfix_postmap_alias.rc != 0
+
+- name: "Ensuring Postfix virtual mailbox map database is present"
+  ansible.builtin.command:
+    cmd: "postmap {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_mailbox_maps_path }}"
+  register: postfix_postmap_mailbox
+  changed_when: true
+  failed_when: postfix_postmap_mailbox.rc != 0
+
+- name: "Checking Postfix configuration"
+  ansible.builtin.command:
+    cmd: "postfix check"
+  register: postfix_check
+  changed_when: false
+  failed_when: postfix_check.rc != 0
+
+- name: "Collecting service facts"
+  ansible.builtin.service_facts:
+
+- name: "Reloading Postfix after virtual map update"
+  ansible.builtin.systemd:
+    name: "{{ postfix_service_name }}"
+    state: "reloaded"
+  when:
+    - ansible_facts.services[postfix_service_name ~ '.service'] is defined
+    - ansible_facts.services[postfix_service_name ~ '.service'].state == 'running'

@@ -1,0 +1,10 @@
+# Managed by Ansible. Manual changes may be overwritten.
+
+{% for domain in postfix_virtual_domains %}
+{% for mailbox in domain.mailboxes | default([]) %}
+{{ mailbox.user }}@{{ domain.name }} {{ domain.name }}/{{ mailbox.user }}/
+{% endfor %}
+{% endfor %}
+{% for mailbox in postfix_virtual_mailboxes %}
+{{ mailbox.address }} {{ mailbox.path }}
+{% endfor %}
