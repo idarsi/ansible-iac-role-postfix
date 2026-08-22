@@ -61,3 +61,15 @@ pushes to `main`, and manual dispatches. It performs a production-profile
 `ansible-lint` check and runs every Molecule scenario on an Ubuntu GitHub runner
 with Podman. The workflow checks out `tasks/shared` recursively so the role is
 tested with its pinned shared-task dependency.
+
+Run the production-profile lint check locally before running the Molecule
+scenarios:
+
+```bash
+ANSIBLE_ROLES_PATH=.. ansible-lint --profile production
+```
+
+Molecule's current releases do not provide Ansible Lint as a built-in scenario
+phase, so lint is a separate static-analysis gate in the same GitHub Actions
+workflow. The repository's `.ansible-lint` file keeps the profile and shared
+task exclusions in version control.

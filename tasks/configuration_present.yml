@@ -269,7 +269,11 @@
     name: "{{ postfix_service_name }}"
     state: "reloaded"
   when:
-    - postfix_main_cf.changed or postfix_virtual_alias_map.changed or postfix_virtual_mailbox_map.changed or (postfix_backup_mx_domains | length > 0 and (postfix_relay_recipient_map.changed or postfix_transport_map.changed))
+    - >-
+      postfix_main_cf.changed or postfix_virtual_alias_map.changed or
+      postfix_virtual_mailbox_map.changed or
+      (postfix_backup_mx_domains | length > 0 and
+      (postfix_relay_recipient_map.changed or postfix_transport_map.changed))
     - ansible_facts.services[postfix_service_name ~ '.service'] is defined
     - ansible_facts.services[postfix_service_name ~ '.service'].state == 'running'
 

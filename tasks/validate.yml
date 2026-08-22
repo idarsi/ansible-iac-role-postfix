@@ -120,7 +120,14 @@
       - item.1.destination is defined
       - item.1.destination | string | length > 0
     fail_msg: "Each Postfix domain alias must define source and destination"
-  loop: "{{ query('subelements', (iac_blueprint.postfix.virtual_alias_domains | default([])) + (iac_blueprint.postfix.virtual_mailbox_domains | default([])), 'aliases', {'skip_missing': true}) }}"
+  loop: >-
+    {{ query(
+      'subelements',
+      (iac_blueprint.postfix.virtual_alias_domains | default([])) +
+      (iac_blueprint.postfix.virtual_mailbox_domains | default([])),
+      'aliases',
+      {'skip_missing': true}
+    ) }}
   loop_control:
     label: "{{ item.1.source | default('missing-source') }}"
 
