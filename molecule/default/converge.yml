@@ -41,6 +41,12 @@
               - "info@backup.molecule.example.org"
               - "sales@backup.molecule.example.org"
   pre_tasks:
+    - name: "Installing Postfix LMDB map support"
+      ansible.builtin.dnf:
+        name: postfix-lmdb
+        state: present
+      when: molecule_postfix_map_type | default('auto') == 'lmdb'
+
     - name: "Installing netcat for SMTP integration checks"
       ansible.builtin.dnf:
         name: nmap-ncat
