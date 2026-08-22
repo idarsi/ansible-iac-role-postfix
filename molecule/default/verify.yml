@@ -15,13 +15,9 @@
       - /var/vmail/molecule.example.org/sales/tmp
     postfix_map_paths:
       - /etc/postfix/virtual
-      - /etc/postfix/virtual.db
       - /etc/postfix/vmailbox
-      - /etc/postfix/vmailbox.db
       - /etc/postfix/relay_recipients
-      - /etc/postfix/relay_recipients.db
       - /etc/postfix/transport
-      - /etc/postfix/transport.db
   tasks:
     - name: "Checking Postfix package is installed"
       ansible.builtin.command: rpm -q postfix
@@ -47,6 +43,20 @@
       ansible.builtin.command: postconf -h virtual_mailbox_maps
       register: postfix_map_type
       changed_when: false
+
+    - name: "Selecting expected Postfix map database suffix"
+      ansible.builtin.set_fact:
+        postfix_map_database_suffix: >-
+          {{ '.db' if (postfix_map_type.stdout | trim) is search('^hash:') else '.lmdb' }}
+
+    - name: "Adding expected Postfix map database paths"
+      ansible.builtin.set_fact:
+        postfix_map_paths: "{{ postfix_map_paths + [
+          '/etc/postfix/virtual' ~ postfix_map_database_suffix,
+          '/etc/postfix/vmailbox' ~ postfix_map_database_suffix,
+          '/etc/postfix/relay_recipients' ~ postfix_map_database_suffix,
+          '/etc/postfix/transport' ~ postfix_map_database_suffix
+        ] }}"
 
     - name: "Checking Postfix map files"
       ansible.builtin.stat:
