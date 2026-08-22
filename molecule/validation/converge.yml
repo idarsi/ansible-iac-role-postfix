@@ -1,0 +1,161 @@
+---
+- name: "Validate a valid Postfix blueprint"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    ansible_become_method: su
+    iac_blueprint:
+      postfix:
+        virtual_mailbox_domains:
+          - name: "molecule.example.org"
+            mailboxes:
+              - user: "info"
+        virtual_alias_domains:
+          - name: "aliases.molecule.example.org"
+            aliases:
+              - source: "support@aliases.molecule.example.org"
+                destination: "info@molecule.example.org"
+        backup_mx_domains:
+          - name: "backup.molecule.example.org"
+            primary_mx: "primary.molecule.example.org"
+            recipients:
+              - "info@backup.molecule.example.org"
+  tasks:
+    - name: "Running valid Postfix blueprint validation"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+
+    - name: "Writing valid blueprint marker"
+      ansible.builtin.copy:
+        dest: /tmp/postfix-validation-valid.ok
+        content: "ok\n"
+        mode: "0644"
+
+- name: "Reject an overlapping Postfix domain blueprint"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    ansible_become_method: su
+    iac_blueprint:
+      postfix:
+        virtual_mailbox_domains:
+          - name: "overlap.molecule.example.org"
+        virtual_alias_domains:
+          - name: "overlap.molecule.example.org"
+  tasks:
+    - name: "Running validation expecting domain overlap failure"
+      block:
+        - name: "Applying overlapping Postfix domain classes"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if overlapping domain classes were accepted"
+          ansible.builtin.fail:
+            msg: "Overlapping Postfix domain classes were accepted"
+      rescue:
+        - name: "Checking domain overlap failure message"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is defined
+              - (ansible_failed_result | to_nice_json) is search("A Postfix domain may belong to only one domain class")
+        - name: "Writing domain overlap marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-overlap.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject an incomplete Postfix backup MX blueprint"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    ansible_become_method: su
+    iac_blueprint:
+      postfix:
+        backup_mx_domains:
+          - name: "backup.molecule.example.org"
+            primary_mx: "primary.molecule.example.org"
+  tasks:
+    - name: "Running validation expecting backup MX field failure"
+      block:
+        - name: "Applying incomplete backup MX record"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if incomplete backup MX was accepted"
+          ansible.builtin.fail:
+            msg: "Incomplete backup MX record was accepted"
+      rescue:
+        - name: "Checking backup MX failure message"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is defined
+              - (ansible_failed_result | to_nice_json) is search("Each backup MX domain requires name, primary_mx, and recipients")
+        - name: "Writing backup MX marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-backup-mx.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject duplicate Postfix domain names"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    ansible_become_method: su
+    iac_blueprint:
+      postfix:
+        virtual_alias_domains:
+          - name: "duplicate.molecule.example.org"
+          - name: "duplicate.molecule.example.org"
+  tasks:
+    - name: "Running validation expecting duplicate domain failure"
+      block:
+        - name: "Applying duplicate Postfix domain records"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if duplicate domains were accepted"
+          ansible.builtin.fail:
+            msg: "Duplicate Postfix domains were accepted"
+      rescue:
+        - name: "Checking duplicate domain failure message"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is defined
+              - (ansible_failed_result | to_nice_json) is search("Postfix domain names must be unique")
+        - name: "Writing duplicate domain marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-duplicate.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject malformed Postfix alias records"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    ansible_become_method: su
+    iac_blueprint:
+      postfix:
+        virtual_aliases:
+          - source: "broken@molecule.example.org"
+  tasks:
+    - name: "Running validation expecting alias record failure"
+      block:
+        - name: "Applying malformed Postfix alias"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if malformed aliases were accepted"
+          ansible.builtin.fail:
+            msg: "Malformed Postfix aliases were accepted"
+      rescue:
+        - name: "Checking alias record failure message"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is defined
+              - (ansible_failed_result | to_nice_json) is search("Each Postfix virtual alias must define source and destination")
+        - name: "Writing malformed alias marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-alias.ok
+            content: "ok\n"
+            mode: "0644"

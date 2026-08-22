@@ -1,0 +1,16 @@
+---
+- name: "Verify Postfix lifecycle"
+  hosts: all
+  become: false
+  tasks:
+    - name: "Checking Postfix package remains absent"
+      ansible.builtin.command: rpm -q postfix
+      register: postfix_package_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Verifying final lifecycle state"
+      ansible.builtin.assert:
+        that:
+          - postfix_package_check.rc != 0
+        fail_msg: "Postfix lifecycle scenario did not finish in absent state"

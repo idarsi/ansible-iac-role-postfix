@@ -1,0 +1,5 @@
+# Managed by Ansible. Manual changes may be overwritten.
+
+{% for domain in postfix_backup_mx_domains %}
+{{ domain.name }} smtp:[{{ domain.primary_mx }}]
+{% endfor %}

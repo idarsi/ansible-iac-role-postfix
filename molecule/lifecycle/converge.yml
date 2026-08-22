@@ -1,0 +1,179 @@
+---
+- name: "Exercise Postfix lifecycle and targeted states"
+  hosts: all
+  become: false
+  vars:
+    state: install
+    ansible_become_method: su
+    iac_blueprint:
+      postfix:
+        configuration:
+          myhostname: "mx.lifecycle.example.org"
+          mydomain: "lifecycle.example.org"
+          inet_protocols: "ipv4"
+        virtual_mailbox_domains:
+          - name: "lifecycle.example.org"
+            mailboxes:
+              - user: "info"
+        virtual_aliases:
+          - source: "postmaster@lifecycle.example.org"
+            destination: "info@lifecycle.example.org"
+  pre_tasks:
+    - name: "Installing netcat for lifecycle fixtures"
+      ansible.builtin.dnf:
+        name: nmap-ncat
+        state: present
+  roles:
+    - role: ansible-iac-role-postfix
+  tasks:
+    - name: "Adding a targeted virtual alias"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: virtual_alias_present
+        iac_blueprint:
+          postfix:
+            virtual_alias_targets:
+              - source: "ops@lifecycle.example.org"
+                destination: "info@lifecycle.example.org"
+
+    - name: "Checking targeted virtual alias was added"
+      ansible.builtin.command: grep -F "ops@lifecycle.example.org info@lifecycle.example.org" /etc/postfix/virtual
+      changed_when: false
+
+    - name: "Removing the targeted virtual alias"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: virtual_alias_absent
+        iac_blueprint:
+          postfix:
+            virtual_alias_targets:
+              - source: "ops@lifecycle.example.org"
+                destination: "info@lifecycle.example.org"
+
+    - name: "Checking targeted virtual alias was removed"
+      ansible.builtin.command: grep -F "ops@lifecycle.example.org info@lifecycle.example.org" /etc/postfix/virtual
+      register: postfix_alias_absent_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Asserting targeted virtual alias removal"
+      ansible.builtin.assert:
+        that:
+          - postfix_alias_absent_check.rc != 0
+
+    - name: "Adding a targeted virtual mailbox"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: virtual_mailbox_present
+        iac_blueprint:
+          postfix:
+            virtual_mailbox_targets:
+              - domain: "lifecycle.example.org"
+                user: "targeted"
+
+    - name: "Checking targeted virtual mailbox was added"
+      ansible.builtin.stat:
+        path: /var/vmail/lifecycle.example.org/targeted/new
+      register: postfix_mailbox_present_check
+
+    - name: "Asserting targeted virtual mailbox creation"
+      ansible.builtin.assert:
+        that:
+          - postfix_mailbox_present_check.stat.isdir
+
+    - name: "Removing the targeted virtual mailbox"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: virtual_mailbox_absent
+        iac_blueprint:
+          postfix:
+            virtual_mailbox_targets:
+              - domain: "lifecycle.example.org"
+                user: "targeted"
+
+    - name: "Checking targeted virtual mailbox was removed"
+      ansible.builtin.stat:
+        path: /var/vmail/lifecycle.example.org/targeted
+      register: postfix_mailbox_absent_check
+
+    - name: "Asserting targeted virtual mailbox removal"
+      ansible.builtin.assert:
+        that:
+          - not postfix_mailbox_absent_check.stat.exists
+
+    - name: "Stopping Postfix"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: stopped
+
+    - name: "Checking Postfix is stopped"
+      ansible.builtin.command: systemctl is-active postfix
+      register: postfix_stopped_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Asserting stopped state"
+      ansible.builtin.assert:
+        that:
+          - postfix_stopped_check.rc != 0
+
+    - name: "Starting Postfix"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: started
+
+    - name: "Restarting Postfix"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: restarted
+
+    - name: "Checking Postfix is active after restart"
+      ansible.builtin.command: systemctl is-active postfix
+      register: postfix_restarted_check
+      changed_when: false
+
+    - name: "Asserting restarted state"
+      ansible.builtin.assert:
+        that:
+          - postfix_restarted_check.stdout == 'active'
+
+    - name: "Removing Postfix installation"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: absent
+
+    - name: "Checking Postfix package is absent"
+      ansible.builtin.command: rpm -q postfix
+      register: postfix_package_absent_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Asserting absent state"
+      ansible.builtin.assert:
+        that:
+          - postfix_package_absent_check.rc != 0
+
+    - name: "Uninstalling Postfix idempotently"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: uninstall
+
+    - name: "Checking Postfix package remains absent after uninstall"
+      ansible.builtin.command: rpm -q postfix
+      register: postfix_package_uninstall_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Asserting uninstall state"
+      ansible.builtin.assert:
+        that:
+          - postfix_package_uninstall_check.rc != 0

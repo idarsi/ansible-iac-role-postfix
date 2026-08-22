@@ -1,0 +1,6 @@
+---
+- name: "Preparing Postfix virtual mailbox directories"
+  ansible.builtin.include_tasks: mailbox_directories_prepare.yml
+
+- name: "Ensuring Postfix virtual mailbox directories are absent"
+  ansible.builtin.include_tasks: fs_absent.yml

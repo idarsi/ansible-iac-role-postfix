@@ -1,0 +1,22 @@
+---
+- name: "Verify Postfix validation markers"
+  hosts: all
+  become: false
+  tasks:
+    - name: "Checking validation markers"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /tmp/postfix-validation-valid.ok
+        - /tmp/postfix-validation-overlap.ok
+        - /tmp/postfix-validation-backup-mx.ok
+        - /tmp/postfix-validation-duplicate.ok
+        - /tmp/postfix-validation-alias.ok
+      register: postfix_validation_markers
+
+    - name: "Checking all Postfix validation cases completed"
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Postfix validation marker is missing: {{ item.item }}"
+      loop: "{{ postfix_validation_markers.results }}"

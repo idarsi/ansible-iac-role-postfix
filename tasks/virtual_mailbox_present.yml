@@ -11,17 +11,6 @@
   ansible.builtin.set_fact:
     postfix_effective_virtual_mailbox_targets: "{{ postfix_virtual_mailbox_targets | default([]) }}"
 
-- name: "Falling back virtual mailbox present target from virtual domain definitions"
-  ansible.builtin.set_fact:
-    postfix_effective_virtual_mailbox_targets:
-      - domain: "{{ postfix_virtual_domains[-1].name }}"
-        user: "{{ postfix_virtual_domains[-1].mailboxes[-1].user }}"
-  when:
-    - postfix_effective_virtual_mailbox_targets | length == 0
-    - postfix_virtual_domains | length > 0
-    - postfix_virtual_domains[-1].mailboxes is defined
-    - postfix_virtual_domains[-1].mailboxes | length > 0
-
 - name: "Checking virtual mailbox present requirements"
   ansible.builtin.assert:
     that:
@@ -82,27 +71,12 @@
   loop_control:
     label: "{{ item.user }}@{{ item.domain }}"
 
-- name: "Ensuring virtual mailbox directories are present for targets"
-  ansible.builtin.file:
-    path: "{{ postfix_virtual_mailbox_base }}/{{ item.domain }}/{{ item.user }}"
-    state: "directory"
-    owner: "{{ postfix_vmail_user_name }}"
-    group: "{{ postfix_vmail_group_name }}"
-    mode: "0750"
-  loop: "{{ postfix_effective_virtual_mailbox_targets }}"
-  loop_control:
-    label: "{{ item.user }}@{{ item.domain }}"
+- name: "Setting Postfix virtual mailbox directory targets"
+  ansible.builtin.set_fact:
+    postfix_mailbox_directory_targets: "{{ postfix_effective_virtual_mailbox_targets }}"
 
-- name: "Ensuring virtual mailbox Maildir subdirectories are present for targets"
-  ansible.builtin.file:
-    path: "{{ postfix_virtual_mailbox_base }}/{{ item.0.domain }}/{{ item.0.user }}/{{ item.1 }}"
-    state: "directory"
-    owner: "{{ postfix_vmail_user_name }}"
-    group: "{{ postfix_vmail_group_name }}"
-    mode: "0750"
-  loop: "{{ postfix_effective_virtual_mailbox_targets | product(['new', 'cur', 'tmp']) | list }}"
-  loop_control:
-    label: "{{ item.0.user }}@{{ item.0.domain }}/{{ item.1 }}"
+- name: "Ensuring Postfix virtual mailbox directories are present for targets"
+  ansible.builtin.include_tasks: mailbox_directories_present.yml
 
 - name: "Rebuilding Postfix maps after virtual mailbox present"
   ansible.builtin.include_tasks: maps_rebuild.yml

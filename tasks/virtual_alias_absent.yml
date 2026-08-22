@@ -11,17 +11,6 @@
   ansible.builtin.set_fact:
     postfix_effective_virtual_alias_targets: "{{ postfix_virtual_alias_targets | default([]) }}"
 
-- name: "Falling back virtual alias absent target from virtual domain definitions"
-  ansible.builtin.set_fact:
-    postfix_effective_virtual_alias_targets:
-      - source: "{{ postfix_virtual_domains[-1].aliases[-1].source }}"
-        destination: "{{ postfix_virtual_domains[-1].aliases[-1].destination }}"
-  when:
-    - postfix_effective_virtual_alias_targets | length == 0
-    - postfix_virtual_domains | length > 0
-    - postfix_virtual_domains[-1].aliases is defined
-    - postfix_virtual_domains[-1].aliases | length > 0
-
 - name: "Checking virtual alias absent requirements"
   ansible.builtin.assert:
     that:

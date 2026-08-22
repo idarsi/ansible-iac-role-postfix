@@ -15,7 +15,9 @@
   ansible.builtin.assert:
     that:
       - postfix_configuration is defined
-      - postfix_virtual_domains is defined
+      - postfix_virtual_alias_domains is defined
+      - postfix_virtual_mailbox_domains is defined
+      - postfix_backup_mx_domains is defined
       - postfix_virtual_aliases is defined
       - postfix_virtual_mailboxes is defined
       - postfix_etc_directory is defined
@@ -28,7 +30,7 @@
       - postfix_vmail_group_gid is defined
       - postfix_vmail_user_name is defined
       - postfix_vmail_user_uid is defined
-    fail_msg: "All tests did not pass"
+    fail_msg: "All Postfix configuration variables must be defined"
 
 ###############################################################################
 # ENSURING POSTFIX CONFIGURATION
@@ -143,6 +145,38 @@
     mode: "0644"
   register: postfix_virtual_mailbox_map
 
+- name: "Checking Postfix backup MX recipient map database"
+  ansible.builtin.stat:
+    path: "{{ postfix_relay_recipient_maps_db_path if postfix_effective_virtual_alias_maps_type == 'hash' else postfix_relay_recipient_maps_lmdb_path }}"
+  register: postfix_relay_recipient_maps_db
+  when: postfix_backup_mx_domains | length > 0
+
+- name: "Ensuring Postfix backup MX recipient map is present"
+  ansible.builtin.template:
+    src: "relay_recipients.j2"
+    dest: "{{ postfix_relay_recipient_maps_path }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: postfix_relay_recipient_map
+  when: postfix_backup_mx_domains | length > 0
+
+- name: "Checking Postfix backup MX transport map database"
+  ansible.builtin.stat:
+    path: "{{ postfix_transport_maps_db_path if postfix_effective_virtual_alias_maps_type == 'hash' else postfix_transport_maps_lmdb_path }}"
+  register: postfix_transport_maps_db
+  when: postfix_backup_mx_domains | length > 0
+
+- name: "Ensuring Postfix backup MX transport map is present"
+  ansible.builtin.template:
+    src: "transport.j2"
+    dest: "{{ postfix_transport_maps_path }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: postfix_transport_map
+  when: postfix_backup_mx_domains | length > 0
+
 - name: "Checking virtual mailbox domain entries"
   ansible.builtin.assert:
     that:
@@ -150,7 +184,7 @@
       - item.1.user is defined
       - item.1.user | length > 0
     fail_msg: "Each virtual mailbox entry must include domain name and mailbox user"
-  loop: "{{ query('subelements', postfix_virtual_domains, 'mailboxes', {'skip_missing': true}) }}"
+  loop: "{{ query('subelements', postfix_virtual_mailbox_domains, 'mailboxes', {'skip_missing': true}) }}"
   loop_control:
     label: "{{ (item.1.user | default('missing-user')) ~ '@' ~ (item.0.name | default('missing-domain')) }}"
 
@@ -166,27 +200,23 @@
   loop_control:
     label: "{{ item.address | default('missing-address') }}"
 
-- name: "Ensuring virtual mailbox directories are present"
-  ansible.builtin.file:
-    path: "{{ postfix_virtual_mailbox_base }}/{{ item.0.name }}/{{ item.1.user }}"
-    state: "directory"
-    owner: "{{ postfix_vmail_user_name }}"
-    group: "{{ postfix_vmail_group_name }}"
-    mode: "0750"
-  loop: "{{ query('subelements', postfix_virtual_domains, 'mailboxes', {'skip_missing': true}) }}"
+- name: "Initializing Postfix virtual mailbox directory targets"
+  ansible.builtin.set_fact:
+    postfix_mailbox_directory_targets: []
+
+- name: "Adding Postfix virtual mailbox directory targets"
+  ansible.builtin.set_fact:
+    postfix_mailbox_directory_targets: >-
+      {{
+        postfix_mailbox_directory_targets
+        + [{'domain': item.0.name, 'user': item.1.user}]
+      }}
+  loop: "{{ query('subelements', postfix_virtual_mailbox_domains, 'mailboxes', {'skip_missing': true}) }}"
   loop_control:
     label: "{{ item.1.user }}@{{ item.0.name }}"
 
-- name: "Ensuring virtual mailbox Maildir subdirectories are present"
-  ansible.builtin.file:
-    path: "{{ postfix_virtual_mailbox_base }}/{{ item.0.0.name }}/{{ item.0.1.user }}/{{ item.1 }}"
-    state: "directory"
-    owner: "{{ postfix_vmail_user_name }}"
-    group: "{{ postfix_vmail_group_name }}"
-    mode: "0750"
-  loop: "{{ query('subelements', postfix_virtual_domains, 'mailboxes', {'skip_missing': true}) | product(['new', 'cur', 'tmp']) | list }}"
-  loop_control:
-    label: "{{ item.0.1.user }}@{{ item.0.0.name }}/{{ item.1 }}"
+- name: "Ensuring Postfix virtual mailbox directories are present"
+  ansible.builtin.include_tasks: mailbox_directories_present.yml
 
 - name: "Ensuring Postfix virtual alias map database is present"
   ansible.builtin.command:
@@ -204,6 +234,26 @@
   failed_when: postfix_mailbox_postmap.rc != 0
   when: postfix_virtual_mailbox_map.changed or not postfix_virtual_mailbox_maps_db.stat.exists
 
+- name: "Ensuring Postfix backup MX recipient map database is present"
+  ansible.builtin.command:
+    cmd: "postmap {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_relay_recipient_maps_path }}"
+  register: postfix_relay_recipient_postmap
+  changed_when: postfix_relay_recipient_map.changed or not postfix_relay_recipient_maps_db.stat.exists
+  failed_when: postfix_relay_recipient_postmap.rc != 0
+  when:
+    - postfix_backup_mx_domains | length > 0
+    - postfix_relay_recipient_map.changed or not postfix_relay_recipient_maps_db.stat.exists
+
+- name: "Ensuring Postfix backup MX transport map database is present"
+  ansible.builtin.command:
+    cmd: "postmap {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_transport_maps_path }}"
+  register: postfix_transport_postmap
+  changed_when: postfix_transport_map.changed or not postfix_transport_maps_db.stat.exists
+  failed_when: postfix_transport_postmap.rc != 0
+  when:
+    - postfix_backup_mx_domains | length > 0
+    - postfix_transport_map.changed or not postfix_transport_maps_db.stat.exists
+
 - name: "Checking Postfix configuration"
   ansible.builtin.command:
     cmd: "postfix check"
@@ -219,7 +269,7 @@
     name: "{{ postfix_service_name }}"
     state: "reloaded"
   when:
-    - postfix_main_cf.changed or postfix_virtual_alias_map.changed or postfix_virtual_mailbox_map.changed
+    - postfix_main_cf.changed or postfix_virtual_alias_map.changed or postfix_virtual_mailbox_map.changed or (postfix_backup_mx_domains | length > 0 and (postfix_relay_recipient_map.changed or postfix_transport_map.changed))
     - ansible_facts.services[postfix_service_name ~ '.service'] is defined
     - ansible_facts.services[postfix_service_name ~ '.service'].state == 'running'
 

@@ -11,7 +11,7 @@ iac_blueprint:
         - "[::1]/128"
       extra_parameters:
         smtpd_banner: "$myhostname ESMTP"
-    virtual_domains:
+    virtual_mailbox_domains:
       - name: "example.com"
         mailboxes:
           - user: "info"
@@ -21,12 +21,17 @@ iac_blueprint:
             destination: "info@example.com"
           - source: "@example.com"
             destination: "sales@example.com"
-      - name: "example.net"
-        mailboxes:
-          - user: "admin"
+    virtual_alias_domains:
+      - name: "aliases.example.net"
         aliases:
-          - source: "admin@example.net"
-            destination: "admin@example.net"
+          - source: "admin@aliases.example.net"
+            destination: "admin@example.com"
+    backup_mx_domains:
+      - name: "example.org"
+        primary_mx: "mail.example.org"
+        recipients:
+          - "info@example.org"
+          - "sales@example.org"
     virtual_aliases:
       - source: "postmaster@example.com"
         destination: "root"
