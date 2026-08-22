@@ -1,0 +1,152 @@
+---
+- name: Verify
+  hosts: all
+  become: false
+  vars:
+    ansible_become_method: su
+    postfix_mailbox_paths:
+      - /var/vmail/molecule.example.org/info
+      - /var/vmail/molecule.example.org/info/new
+      - /var/vmail/molecule.example.org/info/cur
+      - /var/vmail/molecule.example.org/info/tmp
+      - /var/vmail/molecule.example.org/sales
+      - /var/vmail/molecule.example.org/sales/new
+      - /var/vmail/molecule.example.org/sales/cur
+      - /var/vmail/molecule.example.org/sales/tmp
+    postfix_map_paths:
+      - /etc/postfix/virtual
+      - /etc/postfix/vmailbox
+      - /etc/postfix/relay_recipients
+      - /etc/postfix/transport
+  tasks:
+    - name: "Checking Postfix package is installed"
+      ansible.builtin.command: rpm -q postfix
+      register: postfix_package_check
+      changed_when: false
+
+    - name: "Checking Postfix service is active"
+      ansible.builtin.command: systemctl is-active postfix
+      register: postfix_service_check
+      changed_when: false
+
+    - name: "Checking Postfix configuration"
+      ansible.builtin.command: postfix check
+      register: postfix_check
+      changed_when: false
+
+    - name: "Reading effective Postfix configuration"
+      ansible.builtin.command: postconf -n
+      register: postfix_effective_config
+      changed_when: false
+
+    - name: "Reading effective Postfix map type"
+      ansible.builtin.command: postconf -h virtual_mailbox_maps
+      register: postfix_map_type
+      changed_when: false
+
+    - name: "Selecting expected Postfix map database suffix"
+      ansible.builtin.set_fact:
+        postfix_map_database_suffix: >-
+          {{ '.db' if (postfix_map_type.stdout | trim) is search('^hash:') else '.lmdb' }}
+
+    - name: "Adding expected Postfix map database paths"
+      ansible.builtin.set_fact:
+        postfix_map_paths: "{{ postfix_map_paths + [
+          '/etc/postfix/virtual' ~ postfix_map_database_suffix,
+          '/etc/postfix/vmailbox' ~ postfix_map_database_suffix,
+          '/etc/postfix/relay_recipients' ~ postfix_map_database_suffix,
+          '/etc/postfix/transport' ~ postfix_map_database_suffix
+        ] }}"
+
+    - name: "Checking Postfix map files"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ postfix_map_paths }}"
+      register: postfix_map_stats
+
+    - name: "Checking Postfix Maildir paths"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ postfix_mailbox_paths }}"
+      register: postfix_mailbox_stats
+
+    - name: "Checking virtual mailbox lookup"
+      ansible.builtin.command: >-
+        postmap -q info@molecule.example.org {{ postfix_map_type.stdout | trim }}
+      register: postfix_mailbox_lookup
+      changed_when: false
+
+    - name: "Checking virtual alias lookup"
+      ansible.builtin.command: >-
+        postmap -q support@aliases.molecule.example.org {{ postfix_map_type.stdout | trim | regex_replace('/vmailbox$', '/virtual') }}
+      register: postfix_alias_lookup
+      changed_when: false
+
+    - name: "Checking backup MX recipient lookup"
+      ansible.builtin.command: >-
+        postmap -q info@backup.molecule.example.org {{ postfix_map_type.stdout | trim | regex_replace('/vmailbox$', '/relay_recipients') }}
+      register: postfix_relay_recipient_lookup
+      changed_when: false
+
+    - name: "Checking backup MX transport lookup"
+      ansible.builtin.command: >-
+        postmap -q backup.molecule.example.org {{ postfix_map_type.stdout | trim | regex_replace('/vmailbox$', '/transport') }}
+      register: postfix_transport_lookup
+      changed_when: false
+
+    - name: "Checking SMTP acceptance for a known backup MX recipient"
+      ansible.builtin.shell: |
+        printf 'EHLO molecule.example.org\nMAIL FROM:<sender@example.net>\nRCPT TO:<info@backup.molecule.example.org>\nDATA\nSubject: Molecule backup MX test\n\nqueued\n.\nQUIT\n' | nc -w 5 127.0.0.1 25
+      register: postfix_backup_mx_smtp_acceptance
+      changed_when: false
+
+    - name: "Checking SMTP rejection for an unknown backup MX recipient"
+      ansible.builtin.shell: |
+        printf 'EHLO molecule.example.org\nMAIL FROM:<sender@example.net>\nRCPT TO:<unknown@backup.molecule.example.org>\nQUIT\n' | nc -w 5 127.0.0.1 25
+      register: postfix_backup_mx_smtp_rejection
+      changed_when: false
+
+    - name: "Checking queued backup MX message"
+      ansible.builtin.command: postqueue -p
+      register: postfix_queue
+      changed_when: false
+
+    - name: "Verifying Molecule-managed Postfix state"
+      ansible.builtin.assert:
+        that:
+          - postfix_package_check.rc == 0
+          - postfix_service_check.stdout == 'active'
+          - postfix_check.rc == 0
+          - postfix_effective_config.stdout is search('virtual_alias_domains = aliases.molecule.example.org')
+          - postfix_effective_config.stdout is search('virtual_mailbox_domains = molecule.example.org')
+          - postfix_effective_config.stdout is search('relay_domains = backup.molecule.example.org')
+          - postfix_map_type.stdout is search('^(hash|lmdb):/etc/postfix/vmailbox$')
+          - postfix_effective_config.stdout is search('relay_recipient_maps = (hash|lmdb):/etc/postfix/relay_recipients')
+          - postfix_effective_config.stdout is search('transport_maps = (hash|lmdb):/etc/postfix/transport')
+          - item.stat.exists
+          - item.stat.isreg
+        fail_msg: "Postfix Molecule verification failed"
+      loop: "{{ postfix_map_stats.results }}"
+
+    - name: "Verifying Postfix Maildir paths"
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isdir
+          - item.stat.pw_name == 'vmail'
+          - item.stat.gr_name == 'vmail'
+          - item.stat.mode == '0750'
+        fail_msg: "Postfix Maildir directory verification failed for {{ item.item }}"
+      loop: "{{ postfix_mailbox_stats.results }}"
+
+    - name: "Verifying Postfix map lookups"
+      ansible.builtin.assert:
+        that:
+          - postfix_mailbox_lookup.stdout == 'molecule.example.org/info/'
+          - postfix_alias_lookup.stdout == 'info@molecule.example.org'
+          - postfix_relay_recipient_lookup.stdout == 'OK'
+          - postfix_transport_lookup.stdout == 'smtp:[192.0.2.1]'
+          - postfix_backup_mx_smtp_acceptance.stdout is search('250 2.0.0')
+          - postfix_backup_mx_smtp_rejection.stdout is search('550 5.1.1')
+          - postfix_queue.stdout is search('info@backup.molecule.example.org')
+        fail_msg: "Postfix map lookup verification failed"

@@ -19,12 +19,15 @@ unknown_local_recipient_reject_code = 550
 alias_maps = hash:/etc/aliases
 alias_database = hash:/etc/aliases
 
-{% set virtual_domain_names = postfix_virtual_domains | map(attribute='name') | list %}
-{% set configured_virtual_domains = postfix_configuration.virtual_alias_domains | default(virtual_domain_names) %}
-{% set mailbox_domain_names = (postfix_virtual_domains | selectattr('mailboxes', 'defined') | map(attribute='name') | list) %}
+{% set alias_domain_names = postfix_virtual_alias_domains | map(attribute='name') | list %}
+{% set configured_alias_domains = postfix_configuration.virtual_alias_domains | default(alias_domain_names) %}
+{% set mailbox_domain_names = postfix_virtual_mailbox_domains | map(attribute='name') | list %}
 {% set configured_mailbox_domains = postfix_configuration.virtual_mailbox_domains | default(mailbox_domain_names) %}
-{% if configured_virtual_domains | length > 0 %}
-virtual_alias_domains = {{ configured_virtual_domains | join(', ') }}
+{% set backup_domain_names = postfix_backup_mx_domains | map(attribute='name') | list %}
+{% if configured_alias_domains | length > 0 %}
+virtual_alias_domains = {{ configured_alias_domains | join(', ') }}
+{% endif %}
+{% if postfix_virtual_aliases | length > 0 or postfix_virtual_alias_domains | length > 0 or postfix_virtual_mailbox_domains | length > 0 %}
 virtual_alias_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_alias_maps_path }}
 {% endif %}
 {% if configured_mailbox_domains | length > 0 %}
@@ -33,6 +36,11 @@ virtual_mailbox_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfi
 virtual_mailbox_base = {{ postfix_virtual_mailbox_base }}
 virtual_uid_maps = static:{{ postfix_vmail_user_uid }}
 virtual_gid_maps = static:{{ postfix_vmail_group_gid }}
+{% endif %}
+{% if backup_domain_names | length > 0 %}
+relay_domains = {{ backup_domain_names | join(', ') }}
+relay_recipient_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_relay_recipient_maps_path }}
+transport_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_transport_maps_path }}
 {% endif %}
 
 smtpd_recipient_restrictions = {{ postfix_configuration.smtpd_recipient_restrictions | default(postfix_default_smtpd_recipient_restrictions) | join(', ') }}

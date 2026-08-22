@@ -1,0 +1,190 @@
+---
+###############################################################################
+#
+# validate.yml
+#
+# Validate the complete Postfix blueprint before any state task changes the
+# target host.
+#
+###############################################################################
+
+- name: "Checking Postfix blueprint type"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix is defined
+      - iac_blueprint.postfix | type_debug == 'dict'
+    fail_msg: "iac_blueprint.postfix must be a mapping"
+
+- name: "Checking Postfix role state"
+  ansible.builtin.assert:
+    that:
+      - state is defined
+      - state in
+        [
+          'install', 'uninstall', 'present', 'absent',
+          'configuration_present', 'virtual_alias_present',
+          'virtual_alias_absent', 'virtual_mailbox_present',
+          'virtual_mailbox_absent', 'started', 'stopped', 'restarted',
+          'validate'
+        ]
+    fail_msg: "Unsupported Postfix role state: {{ state | default('undefined') }}"
+
+- name: "Checking Postfix blueprint field types"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix.configuration | default({}) | type_debug == 'dict'
+      - iac_blueprint.postfix.virtual_alias_domains | default([]) | type_debug == 'list'
+      - iac_blueprint.postfix.virtual_mailbox_domains | default([]) | type_debug == 'list'
+      - iac_blueprint.postfix.backup_mx_domains | default([]) | type_debug == 'list'
+      - iac_blueprint.postfix.virtual_aliases | default([]) | type_debug == 'list'
+      - iac_blueprint.postfix.virtual_mailboxes | default([]) | type_debug == 'list'
+    fail_msg: "Postfix blueprint fields must use the expected mapping and list types"
+
+- name: "Checking Postfix domain names are unique within each class"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          (iac_blueprint.postfix.virtual_alias_domains | default([])
+          | map(attribute='name') | list | unique | length)
+          == (iac_blueprint.postfix.virtual_alias_domains | default([]) | length)
+        )
+      - >-
+        (
+          (iac_blueprint.postfix.virtual_mailbox_domains | default([])
+          | map(attribute='name') | list | unique | length)
+          == (iac_blueprint.postfix.virtual_mailbox_domains | default([]) | length)
+        )
+      - >-
+        (
+          (iac_blueprint.postfix.backup_mx_domains | default([])
+          | map(attribute='name') | list | unique | length)
+          == (iac_blueprint.postfix.backup_mx_domains | default([]) | length)
+        )
+    fail_msg: "Postfix domain names must be unique within each domain class"
+
+- name: "Checking that Postfix domain classes do not overlap"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          iac_blueprint.postfix.virtual_alias_domains | default([])
+          | map(attribute='name') | list
+          | intersect(iac_blueprint.postfix.virtual_mailbox_domains | default([]) | map(attribute='name') | list)
+          | length
+        ) == 0
+      - >-
+        (
+          iac_blueprint.postfix.backup_mx_domains | default([])
+          | map(attribute='name') | list
+          | intersect(iac_blueprint.postfix.virtual_alias_domains | default([]) | map(attribute='name') | list)
+          | length
+        ) == 0
+      - >-
+        (
+          iac_blueprint.postfix.backup_mx_domains | default([])
+          | map(attribute='name') | list
+          | intersect(iac_blueprint.postfix.virtual_mailbox_domains | default([]) | map(attribute='name') | list)
+          | length
+        ) == 0
+    fail_msg: "A Postfix domain may belong to only one domain class"
+
+- name: "Checking Postfix virtual alias domain records"
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name | string | length > 0
+      - item.aliases is not defined or item.aliases | type_debug == 'list'
+    fail_msg: "Each virtual alias domain must define a name and aliases list"
+  loop: "{{ iac_blueprint.postfix.virtual_alias_domains | default([]) }}"
+  loop_control:
+    label: "{{ item.name | default('missing-domain') }}"
+
+- name: "Checking Postfix virtual mailbox domain records"
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name | string | length > 0
+      - item.aliases is not defined or item.aliases | type_debug == 'list'
+      - item.mailboxes is not defined or item.mailboxes | type_debug == 'list'
+    fail_msg: "Each virtual mailbox domain must define valid aliases and mailboxes lists"
+  loop: "{{ iac_blueprint.postfix.virtual_mailbox_domains | default([]) }}"
+  loop_control:
+    label: "{{ item.name | default('missing-domain') }}"
+
+- name: "Checking Postfix virtual alias records under domains"
+  ansible.builtin.assert:
+    that:
+      - item.1.source is defined
+      - item.1.source | string | length > 0
+      - item.1.destination is defined
+      - item.1.destination | string | length > 0
+    fail_msg: "Each Postfix domain alias must define source and destination"
+  loop: >-
+    {{ query(
+      'subelements',
+      (iac_blueprint.postfix.virtual_alias_domains | default([])) +
+      (iac_blueprint.postfix.virtual_mailbox_domains | default([])),
+      'aliases',
+      {'skip_missing': true}
+    ) }}
+  loop_control:
+    label: "{{ item.1.source | default('missing-source') }}"
+
+- name: "Checking Postfix virtual mailbox records under domains"
+  ansible.builtin.assert:
+    that:
+      - item.1.user is defined
+      - item.1.user | string | length > 0
+    fail_msg: "Each Postfix virtual mailbox must define a non-empty user"
+  loop: "{{ query('subelements', iac_blueprint.postfix.virtual_mailbox_domains | default([]), 'mailboxes', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1.user | default('missing-user') }}@{{ item.0.name | default('missing-domain') }}"
+
+- name: "Checking top-level Postfix virtual alias records"
+  ansible.builtin.assert:
+    that:
+      - item.source is defined
+      - item.source | string | length > 0
+      - item.destination is defined
+      - item.destination | string | length > 0
+    fail_msg: "Each Postfix virtual alias must define source and destination"
+  loop: "{{ iac_blueprint.postfix.virtual_aliases | default([]) }}"
+  loop_control:
+    label: "{{ item.source | default('missing-source') }}"
+
+- name: "Checking top-level Postfix virtual mailbox records"
+  ansible.builtin.assert:
+    that:
+      - item.address is defined
+      - item.address | string | length > 0
+      - item.path is defined
+      - item.path | string | length > 0
+    fail_msg: "Each Postfix virtual mailbox must define address and path"
+  loop: "{{ iac_blueprint.postfix.virtual_mailboxes | default([]) }}"
+  loop_control:
+    label: "{{ item.address | default('missing-address') }}"
+
+- name: "Checking Postfix backup MX domain records"
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name | string | length > 0
+      - item.primary_mx is defined
+      - item.primary_mx | string | length > 0
+      - item.recipients is defined
+      - item.recipients | type_debug == 'list'
+      - item.recipients | length > 0
+    fail_msg: "Each backup MX domain requires name, primary_mx, and recipients"
+  loop: "{{ iac_blueprint.postfix.backup_mx_domains | default([]) }}"
+  loop_control:
+    label: "{{ item.name | default('missing-domain') }}"
+
+- name: "Checking Postfix backup MX recipients"
+  ansible.builtin.assert:
+    that:
+      - item.1 | string | length > 0
+    fail_msg: "Backup MX recipients must be non-empty email addresses"
+  loop: "{{ query('subelements', iac_blueprint.postfix.backup_mx_domains | default([]), 'recipients', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ item.1 | default('missing-recipient') }}"

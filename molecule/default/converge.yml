@@ -1,0 +1,55 @@
+---
+- name: Converge
+  hosts: all
+  become: false
+  vars:
+    state: install
+    ansible_become_method: su
+    postfix_virtual_alias_maps_type: "{{ molecule_postfix_map_type | default('auto') }}"
+    iac_blueprint:
+      postfix:
+        configuration:
+          myhostname: "mx.molecule.example.org"
+          mydomain: "molecule.example.org"
+          inet_interfaces: "all"
+          inet_protocols: "ipv4"
+          extra_parameters:
+            smtpd_banner: "$myhostname ESMTP Molecule"
+        virtual_mailbox_domains:
+          - name: "molecule.example.org"
+            mailboxes:
+              - user: "info"
+              - user: "sales"
+            aliases:
+              - source: "postmaster@molecule.example.org"
+                destination: "info@molecule.example.org"
+        virtual_alias_domains:
+          - name: "aliases.molecule.example.org"
+            aliases:
+              - source: "support@aliases.molecule.example.org"
+                destination: "info@molecule.example.org"
+        virtual_aliases:
+          - source: "root@molecule.example.org"
+            destination: "info@molecule.example.org"
+        virtual_mailboxes:
+          - address: "archive@molecule.example.org"
+            path: "molecule.example.org/archive/"
+        backup_mx_domains:
+          - name: "backup.molecule.example.org"
+            primary_mx: "192.0.2.1"
+            recipients:
+              - "info@backup.molecule.example.org"
+              - "sales@backup.molecule.example.org"
+  pre_tasks:
+    - name: "Installing Postfix LMDB map support"
+      ansible.builtin.dnf:
+        name: postfix-lmdb
+        state: present
+      when: molecule_postfix_map_type | default('auto') == 'lmdb'
+
+    - name: "Installing netcat for SMTP integration checks"
+      ansible.builtin.dnf:
+        name: nmap-ncat
+        state: present
+  roles:
+    - role: ansible-iac-role-postfix

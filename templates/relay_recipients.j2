@@ -1,0 +1,7 @@
+# Managed by Ansible. Manual changes may be overwritten.
+
+{% for domain in postfix_backup_mx_domains %}
+{% for recipient in domain.recipients %}
+{{ recipient }} OK
+{% endfor %}
+{% endfor %}

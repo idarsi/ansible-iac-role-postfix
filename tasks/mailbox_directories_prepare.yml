@@ -1,0 +1,36 @@
+---
+- name: "Initializing Postfix virtual mailbox directory records"
+  ansible.builtin.set_fact:
+    iac_fs_directories: []
+
+- name: "Adding Postfix virtual mailbox directories"
+  ansible.builtin.set_fact:
+    iac_fs_directories: >-
+      {{
+        iac_fs_directories
+        + [{
+          'path': postfix_virtual_mailbox_base ~ '/' ~ item.domain ~ '/' ~ item.user,
+          'owner': postfix_vmail_user_name,
+          'group': postfix_vmail_group_name,
+          'mode': '0750'
+        }]
+      }}
+  loop: "{{ postfix_mailbox_directory_targets | default([]) }}"
+  loop_control:
+    label: "{{ item.user }}@{{ item.domain }}"
+
+- name: "Adding Postfix virtual mailbox Maildir directories"
+  ansible.builtin.set_fact:
+    iac_fs_directories: >-
+      {{
+        iac_fs_directories
+        + [{
+          'path': postfix_virtual_mailbox_base ~ '/' ~ item.0.domain ~ '/' ~ item.0.user ~ '/' ~ item.1,
+          'owner': postfix_vmail_user_name,
+          'group': postfix_vmail_group_name,
+          'mode': '0750'
+        }]
+      }}
+  loop: "{{ postfix_mailbox_directory_targets | default([]) | product(['new', 'cur', 'tmp']) | list }}"
+  loop_control:
+    label: "{{ item.0.user }}@{{ item.0.domain }}/{{ item.1 }}"

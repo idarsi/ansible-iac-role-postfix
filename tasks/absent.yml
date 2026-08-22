@@ -11,8 +11,13 @@
 # ENSURING SERVICE IS STOPPED
 ###############################################################################
 
+- name: "Collecting installed package facts"
+  ansible.builtin.package_facts:
+    manager: auto
+
 - name: "Ensuring Postfix service is stopped"
   ansible.builtin.include_tasks: stopped.yml
+  when: postfix_package in ansible_facts.packages
 
 ###############################################################################
 # ENSURING POSTFIX PACKAGE IS ABSENT
