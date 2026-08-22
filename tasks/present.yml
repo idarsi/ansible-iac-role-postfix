@@ -16,6 +16,10 @@
   vars:
     iac_package: "{{ postfix_package }}"
 
+- name: "Reloading systemd manager after Postfix package installation"
+  ansible.builtin.systemd:
+    daemon_reload: true
+
 ###############################################################################
 # ENSURING POSTFIX CONFIGURATION IS PRESENT
 ###############################################################################
