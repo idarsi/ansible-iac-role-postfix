@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - postfix_domain_record.name is defined
-      - postfix_domain_record.name | type_debug == "str"
+      - postfix_domain_record.name is string
       - postfix_domain_record.name is match("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")  # noqa yaml[line-length]
     fail_msg: "Each Postfix domain record requires a valid domain name"
   loop: "{{ (iac_blueprint.postfix.virtual_alias_domains | default([])) + (iac_blueprint.postfix.virtual_mailbox_domains | default([])) + (iac_blueprint.postfix.backup_mx_domains | default([])) }}"  # noqa yaml[line-length]
@@ -62,7 +62,7 @@
 - name: "Checking Postfix configuration override domains"
   ansible.builtin.assert:
     that:
-      - item | type_debug == "str"
+      - item is string
       - item is match("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")  # noqa yaml[line-length]
       - item is not search("[\\x00-\\x1f\\x7f]")
     fail_msg: "Postfix configuration override domains must be safe domain names without control characters"

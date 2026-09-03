@@ -1,5 +1,5 @@
 ---
-- name: "Validate a valid Postfix blueprint"
+- name: "Validate a valid Postfix blueprint with default managed paths"
   hosts: all
   become: false
   vars:

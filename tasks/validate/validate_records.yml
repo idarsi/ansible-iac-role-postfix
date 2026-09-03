@@ -3,9 +3,9 @@
   ansible.builtin.assert:
     that:
       - item.1.source is defined
-      - item.1.source | type_debug == "str"
+      - item.1.source is string
       - item.1.destination is defined
-      - item.1.destination | type_debug == "str"
+      - item.1.destination is string
     fail_msg: "Each Postfix domain alias must define string source and destination values"
   loop: "{{ query('subelements', (iac_blueprint.postfix.virtual_alias_domains | default([])) + (iac_blueprint.postfix.virtual_mailbox_domains | default([])), 'aliases', {'skip_missing': true}) }}"  # noqa yaml[line-length]
 
@@ -13,10 +13,10 @@
   ansible.builtin.assert:
     that:
       - item.1.source is defined
-      - item.1.source | type_debug == "str"
+      - item.1.source is string
       - item.1.source is match("^@?[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+(?:@[A-Za-z0-9.-]+)?$")
       - item.1.destination is defined
-      - item.1.destination | type_debug == "str"
+      - item.1.destination is string
       - item.1.destination | trim | length > 0
       - item.1.source is not search("[\\x00-\\x1f\\x7f]")
       - item.1.destination is not search("[\\x00-\\x1f\\x7f]")
@@ -29,7 +29,7 @@
   ansible.builtin.assert:
     that:
       - item.1.user is defined
-      - item.1.user | type_debug == "str"
+      - item.1.user is string
     fail_msg: "Each Postfix virtual mailbox must define a string user"
   loop: "{{ query('subelements', iac_blueprint.postfix.virtual_mailbox_domains | default([]), 'mailboxes', {'skip_missing': true}) }}"
 
@@ -37,7 +37,7 @@
   ansible.builtin.assert:
     that:
       - item.1.user is defined
-      - item.1.user | type_debug == "str"
+      - item.1.user is string
       - item.1.user is match("^[A-Za-z0-9][A-Za-z0-9._+-]*$")
     fail_msg: "Each Postfix virtual mailbox must define a safe, non-empty user"
   loop: "{{ query('subelements', iac_blueprint.postfix.virtual_mailbox_domains | default([]), 'mailboxes', {'skip_missing': true}) }}"
@@ -48,9 +48,9 @@
   ansible.builtin.assert:
     that:
       - item.source is defined
-      - item.source | type_debug == "str"
+      - item.source is string
       - item.destination is defined
-      - item.destination | type_debug == "str"
+      - item.destination is string
     fail_msg: "Each top-level Postfix virtual alias must define string source and destination values"
   loop: "{{ iac_blueprint.postfix.virtual_aliases | default([]) }}"
 
@@ -72,9 +72,9 @@
   ansible.builtin.assert:
     that:
       - item.address is defined
-      - item.address | type_debug == "str"
+      - item.address is string
       - item.path is defined
-      - item.path | type_debug == "str"
+      - item.path is string
     fail_msg: "Each top-level Postfix virtual mailbox must define string address and path values"
   loop: "{{ iac_blueprint.postfix.virtual_mailboxes | default([]) }}"
 
@@ -84,7 +84,7 @@
       - item.address is defined
       - item.address is match("^[^@\\s]+@[A-Za-z0-9.-]+$")
       - item.path is defined
-      - item.path | type_debug == "str"
+      - item.path is string
       - item.path | trim | length > 0
       - not (item.path is search("(^|/)\\.\\.?(/|$)|(^|/)\\.") )
       - not (item.path.startswith("/"))
@@ -99,7 +99,7 @@
   ansible.builtin.assert:
     that:
       - postfix_backup_record.primary_mx is defined
-      - postfix_backup_record.primary_mx | type_debug == "str"
+      - postfix_backup_record.primary_mx is string
       - postfix_backup_record.primary_mx is match("^[A-Za-z0-9][A-Za-z0-9.-]*$")
       - postfix_backup_record.recipients is defined
       - postfix_backup_record.recipients | type_debug == "list"

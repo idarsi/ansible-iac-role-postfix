@@ -3,9 +3,9 @@
   ansible.builtin.assert:
     that:
       - item.source is defined
-      - item.source | type_debug == "str"
+      - item.source is string
       - item.destination is defined
-      - item.destination | type_debug == "str"
+      - item.destination is string
     fail_msg: "Each postfix.virtual_alias_targets entry must define string source and destination values"
   loop: "{{ postfix_virtual_alias_targets }}"
 
@@ -27,9 +27,9 @@
   ansible.builtin.assert:
     that:
       - item.domain is defined
-      - item.domain | type_debug == "str"
+      - item.domain is string
       - item.user is defined
-      - item.user | type_debug == "str"
+      - item.user is string
     fail_msg: "Each postfix.virtual_mailbox_targets entry must define string domain and user values"
   loop: "{{ postfix_virtual_mailbox_targets }}"
 

@@ -36,14 +36,14 @@
 - name: "Checking Postfix targeted record compatibility types"
   ansible.builtin.assert:
     that:
-      - postfix_virtual_alias_targets_raw | type_debug == "list" or postfix_virtual_alias_targets_raw | type_debug == "str"
-      - postfix_virtual_mailbox_targets_raw | type_debug == "list" or postfix_virtual_mailbox_targets_raw | type_debug == "str"
+      - postfix_virtual_alias_targets_raw | type_debug == "list" or postfix_virtual_alias_targets_raw is string
+      - postfix_virtual_mailbox_targets_raw | type_debug == "list" or postfix_virtual_mailbox_targets_raw is string
       - >-
-        postfix_virtual_alias_targets_raw | type_debug != "str" or
+        postfix_virtual_alias_targets_raw is not string or
         postfix_virtual_alias_targets_raw | trim == "" or
         (postfix_virtual_alias_targets_raw | from_yaml | type_debug == "list")
       - >-
-        postfix_virtual_mailbox_targets_raw | type_debug != "str" or
+        postfix_virtual_mailbox_targets_raw is not string or
         postfix_virtual_mailbox_targets_raw | trim == "" or
         (postfix_virtual_mailbox_targets_raw | from_yaml | type_debug == "list")
     fail_msg: "Postfix targeted records must be lists (legacy YAML strings are accepted)"
@@ -51,10 +51,10 @@
 - name: "Normalizing Postfix targeted records"
   ansible.builtin.set_fact:
     postfix_virtual_alias_targets: >-
-      {{ postfix_virtual_alias_targets_raw if postfix_virtual_alias_targets_raw | type_debug != 'str' else
+       {{ postfix_virtual_alias_targets_raw if postfix_virtual_alias_targets_raw is not string else
          (postfix_virtual_alias_targets_raw | from_yaml if postfix_virtual_alias_targets_raw | trim else []) }}
     postfix_virtual_mailbox_targets: >-
-      {{ postfix_virtual_mailbox_targets_raw if postfix_virtual_mailbox_targets_raw | type_debug != 'str' else
+       {{ postfix_virtual_mailbox_targets_raw if postfix_virtual_mailbox_targets_raw is not string else
          (postfix_virtual_mailbox_targets_raw | from_yaml if postfix_virtual_mailbox_targets_raw | trim else []) }}
 
 - name: "Validating Postfix configuration"
