@@ -70,43 +70,8 @@
     group: "{{ postfix_vmail_group_name }}"
     mode: "0750"
 
-- name: "Collecting supported Postfix map types"
-  ansible.builtin.command:
-    cmd: "postconf -m"
-  register: postfix_supported_map_types
-  changed_when: false
-  failed_when: postfix_supported_map_types.rc != 0
-
-- name: "Setting unsupported Postfix virtual alias map type fallback"
-  ansible.builtin.set_fact:
-    postfix_effective_virtual_alias_maps_type: "unsupported"
-
-- name: "Setting configured Postfix virtual alias map type"
-  ansible.builtin.set_fact:
-    postfix_effective_virtual_alias_maps_type: "{{ postfix_virtual_alias_maps_type }}"
-  when: postfix_virtual_alias_maps_type != 'auto'
-
-- name: "Setting hash Postfix virtual alias map type"
-  ansible.builtin.set_fact:
-    postfix_effective_virtual_alias_maps_type: "hash"
-  when:
-    - postfix_virtual_alias_maps_type == 'auto'
-    - "'hash' in postfix_supported_map_types.stdout_lines"
-
-- name: "Setting LMDB Postfix virtual alias map type"
-  ansible.builtin.set_fact:
-    postfix_effective_virtual_alias_maps_type: "lmdb"
-  when:
-    - postfix_virtual_alias_maps_type == 'auto'
-    - "'hash' not in postfix_supported_map_types.stdout_lines"
-    - "'lmdb' in postfix_supported_map_types.stdout_lines"
-
-- name: "Checking if Postfix virtual alias map type is supported"
-  ansible.builtin.assert:
-    that:
-      - postfix_effective_virtual_alias_maps_type != 'unsupported'
-      - postfix_effective_virtual_alias_maps_type in postfix_supported_map_types.stdout_lines
-    fail_msg: "No supported Postfix virtual alias map type found. Supported map types: {{ postfix_supported_map_types.stdout_lines | join(', ') }}"
+- name: "Preparing Postfix map type"
+  ansible.builtin.include_tasks: map_type_prepare.yml
 
 - name: "Ensuring Postfix main configuration is present"
   ansible.builtin.template:

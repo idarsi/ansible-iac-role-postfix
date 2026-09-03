@@ -1,0 +1,35 @@
+---
+- name: "Converge Postfix mail flow fixture"
+  hosts: all
+  become: false
+  vars:
+    state: "install"
+    ansible_become_method: "su"
+    iac_blueprint:
+      postfix:
+        configuration:
+          myhostname: "mx.mail-flow.example.org"
+          mydomain: "mail-flow.example.org"
+          inet_interfaces: "all"
+          inet_protocols: "ipv4"
+        virtual_mailbox_domains:
+          - name: "mail-flow.example.org"
+            mailboxes:
+              - user: "inbox"
+        virtual_alias_domains:
+          - name: "aliases.mail-flow.example.org"
+            aliases:
+              - source: "forward@aliases.mail-flow.example.org"
+                destination: "inbox@mail-flow.example.org"
+        backup_mx_domains:
+          - name: "backup.mail-flow.example.org"
+            primary_mx: "192.0.2.1"
+            recipients:
+              - "queued@backup.mail-flow.example.org"
+  pre_tasks:
+    - name: "Installing nmap-ncat for SMTP integration checks"
+      ansible.builtin.dnf:
+        name: "nmap-ncat"
+        state: "present"
+  roles:
+    - role: "ansible-iac-role-postfix"

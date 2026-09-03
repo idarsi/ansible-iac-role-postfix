@@ -53,6 +53,9 @@ postfix_virtual_alias_maps_path: "/etc/postfix/virtual"
 postfix_virtual_alias_maps_db_path: "/etc/postfix/virtual.db"
 postfix_virtual_alias_maps_lmdb_path: "/etc/postfix/virtual.lmdb"
 postfix_virtual_alias_maps_type: "auto"
+# Preferred name. postfix_virtual_alias_maps_type remains supported for
+# compatibility with existing inventories.
+postfix_maps_type: "auto"
 postfix_virtual_mailbox_maps_path: "/etc/postfix/vmailbox"
 postfix_virtual_mailbox_maps_db_path: "/etc/postfix/vmailbox.db"
 postfix_virtual_mailbox_maps_lmdb_path: "/etc/postfix/vmailbox.lmdb"

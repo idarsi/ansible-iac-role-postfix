@@ -1,0 +1,73 @@
+---
+- name: "Checking Postfix blueprint type"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix | type_debug == "dict"
+    fail_msg: "iac_blueprint.postfix must be a mapping"
+
+- name: "Checking Postfix role state"
+  ansible.builtin.assert:
+    that:
+      - state is defined
+      - state in ["install", "uninstall", "present", "absent", "configuration_present", "virtual_alias_present", "virtual_alias_absent", "virtual_mailbox_present", "virtual_mailbox_absent", "started", "stopped", "restarted", "validate"]  # noqa yaml[line-length]
+    fail_msg: "Unsupported Postfix role state: {{ state | default('undefined') }}"
+
+- name: "Checking Postfix blueprint field types"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix.configuration | default({}) | type_debug == "dict"
+      - iac_blueprint.postfix.virtual_alias_domains | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.virtual_mailbox_domains | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.backup_mx_domains | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.virtual_aliases | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.virtual_mailboxes | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.configuration.extra_parameters | default({}) | type_debug == "dict"
+    fail_msg: "Postfix blueprint fields must use the expected mapping and list types"
+
+- name: "Normalizing the compatible Postfix map type name"
+  ansible.builtin.set_fact:
+    postfix_map_type: "{{ postfix_maps_type if postfix_maps_type != 'auto' else postfix_virtual_alias_maps_type }}"
+
+- name: "Setting raw Postfix targeted records"
+  ansible.builtin.set_fact:
+    postfix_virtual_alias_targets_raw: "{{ iac_blueprint.postfix.virtual_alias_targets | default([]) }}"
+    postfix_virtual_mailbox_targets_raw: "{{ iac_blueprint.postfix.virtual_mailbox_targets | default([]) }}"
+
+- name: "Checking Postfix targeted record compatibility types"
+  ansible.builtin.assert:
+    that:
+      - postfix_virtual_alias_targets_raw | type_debug == "list" or postfix_virtual_alias_targets_raw | type_debug == "str"
+      - postfix_virtual_mailbox_targets_raw | type_debug == "list" or postfix_virtual_mailbox_targets_raw | type_debug == "str"
+      - >-
+        postfix_virtual_alias_targets_raw | type_debug != "str" or
+        postfix_virtual_alias_targets_raw | trim == "" or
+        (postfix_virtual_alias_targets_raw | from_yaml | type_debug == "list")
+      - >-
+        postfix_virtual_mailbox_targets_raw | type_debug != "str" or
+        postfix_virtual_mailbox_targets_raw | trim == "" or
+        (postfix_virtual_mailbox_targets_raw | from_yaml | type_debug == "list")
+    fail_msg: "Postfix targeted records must be lists (legacy YAML strings are accepted)"
+
+- name: "Normalizing Postfix targeted records"
+  ansible.builtin.set_fact:
+    postfix_virtual_alias_targets: >-
+      {{ postfix_virtual_alias_targets_raw if postfix_virtual_alias_targets_raw | type_debug != 'str' else
+         (postfix_virtual_alias_targets_raw | from_yaml if postfix_virtual_alias_targets_raw | trim else []) }}
+    postfix_virtual_mailbox_targets: >-
+      {{ postfix_virtual_mailbox_targets_raw if postfix_virtual_mailbox_targets_raw | type_debug != 'str' else
+         (postfix_virtual_mailbox_targets_raw | from_yaml if postfix_virtual_mailbox_targets_raw | trim else []) }}
+
+- name: "Validating Postfix configuration"
+  ansible.builtin.include_tasks: validate_configuration.yml
+
+- name: "Validating Postfix domain child structures"
+  ansible.builtin.include_tasks: validate_domain_children.yml
+
+- name: "Validating Postfix mail records"
+  ansible.builtin.include_tasks: validate_records.yml
+
+- name: "Validating Postfix domain records"
+  ansible.builtin.include_tasks: validate_domains.yml
+
+- name: "Validating Postfix targeted records"
+  ansible.builtin.include_tasks: validate_targets.yml

@@ -5,8 +5,7 @@
 Every new or changed `iac_blueprint.postfix` field must be handled in all
 relevant places:
 
-- Add or update preflight validation in the task file that owns the affected
-  configuration, normally `tasks/configuration_present.yml`.
+- Add or update the hierarchical preflight validation under `tasks/validate/`.
 - Add or update a valid inventory example when the inventory shape is
   user-visible.
 - Add at least one Molecule assertion for invalid values or combinations when
@@ -20,6 +19,10 @@ membership, required backup MX fields, allowed values, cross-record
 consistency, and impossible combinations belong in the configuration
 validation. Checks that depend on the current host, installed packages,
 services, files, or Postfix map databases remain in the state-specific tasks.
+
+`absent` and `uninstall` must not remove the virtual mailbox base or unmanaged
+mail data. Targeted mailbox removal must retain absolute-path and traversal
+guardrails.
 
 The three Postfix domain classes are mutually exclusive:
 

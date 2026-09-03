@@ -1,0 +1,253 @@
+---
+- name: "Verify real Postfix mail flow"
+  hosts: all
+  become: false
+  vars:
+    ansible_become_method: "su"
+    mailbox_new: "/var/vmail/mail-flow.example.org/inbox/new"
+    mailbox_message_id: "<mail-flow-mailbox-{{ mail_flow_run }}@example.net>"
+    alias_message_id: "<mail-flow-alias-{{ mail_flow_run }}@example.net>"
+    queue_message_id: "<mail-flow-queue-{{ mail_flow_run }}@example.net>"
+    mailbox_body: "mail-flow-mailbox-{{ mail_flow_run }}"
+    alias_body: "mail-flow-alias-{{ mail_flow_run }}"
+    queue_body: "mail-flow-backup-{{ mail_flow_run }}"
+    smtp_session_helper: |
+      set -o errexit -o nounset -o pipefail
+      coproc smtp_connection { /usr/bin/timeout 20s ncat -w 10 127.0.0.1 25; }
+      smtp_in="${smtp_connection[1]}"
+      smtp_out="${smtp_connection[0]}"
+      smtp_pid="$!"
+      smtp_cleanup() {
+        local status=$?
+        trap - EXIT INT TERM
+        exec {smtp_in}>&- 2>/dev/null || true
+        exec {smtp_out}<&- 2>/dev/null || true
+        if kill -0 "$smtp_pid" 2>/dev/null; then
+          kill "$smtp_pid" 2>/dev/null || true
+        fi
+        wait "$smtp_pid" 2>/dev/null || true
+        return "$status"
+      }
+      trap smtp_cleanup EXIT
+      smtp_read_expect() {
+        local label="$1" expected="$2" line
+        while IFS= read -r line <&"$smtp_out"; do
+          line="${line%$'\r'}"
+          printf '%s: %s\n' "$label" "$line"
+          if [[ "$line" == *"queued as "* ]]; then
+            printf 'QUEUE_ID: %s\n' "${line##*queued as }"
+          fi
+          case "$line" in
+            "$expected "*) return 0 ;;
+            "$expected-"*) ;;
+            *) return 1 ;;
+          esac
+        done
+        return 1
+      }
+      smtp_command() {
+        local label="$1" expected="$2" command="$3"
+        printf '%s\r\n' "$command" >&"$smtp_in"
+        smtp_read_expect "$label" "$expected"
+      }
+  tasks:
+    - name: "Creating one controller-side token for this mail-flow run"
+      ansible.builtin.set_fact:
+        mail_flow_run: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%S%N') }}"
+      run_once: true
+
+    - name: "Sending a message to the virtual mailbox over SMTP"
+      ansible.builtin.shell: |
+        {{ smtp_session_helper }}
+        smtp_read_expect "GREETING" "220"
+        smtp_command "EHLO" "250" "EHLO mail-flow.example.org"
+        smtp_command "MAIL FROM" "250" "MAIL FROM:<sender@example.net>"
+        smtp_command "RCPT TO" "250" "RCPT TO:<inbox@mail-flow.example.org>"
+        smtp_command "DATA" "354" "DATA"
+        printf 'Message-ID: %s\r\nSubject: mail-flow mailbox\r\n\r\n%s\r\n.\r\n' \
+          '{{ mailbox_message_id }}' '{{ mailbox_body }}' >&"$smtp_in"
+        exec {smtp_in}>&-
+        smtp_read_expect "FINAL" "250"
+        exec {smtp_out}<&-
+      args:
+        executable: "/bin/bash"
+      register: mailbox_smtp
+      changed_when: false
+
+    - name: "Waiting for the unique virtual mailbox delivery"
+      ansible.builtin.shell: |
+        set -o pipefail
+        find '{{ mailbox_new }}' -maxdepth 1 -type f \
+          -exec grep -l -F '{{ mailbox_message_id }}' {} + |
+          while IFS= read -r file; do
+            if grep -Fq '{{ mailbox_body }}' "$file"; then
+              printf '%s\n' "$file"
+              break
+            fi
+          done
+      register: mailbox_file
+      changed_when: false
+      until:
+        - mailbox_file.rc == 0
+        - mailbox_file.stdout | trim | length > 0
+      retries: 10
+      delay: 2
+
+    - name: "Reading the unique virtual mailbox message"
+      ansible.builtin.slurp:
+        src: "{{ mailbox_file.stdout | trim }}"
+      register: mailbox_message
+
+    - name: "Sending a message to a virtual alias over SMTP"
+      ansible.builtin.shell: |
+        {{ smtp_session_helper }}
+        smtp_read_expect "GREETING" "220"
+        smtp_command "EHLO" "250" "EHLO mail-flow.example.org"
+        smtp_command "MAIL FROM" "250" "MAIL FROM:<sender@example.net>"
+        smtp_command "RCPT TO" "250" \
+          "RCPT TO:<forward@aliases.mail-flow.example.org>"
+        smtp_command "DATA" "354" "DATA"
+        printf 'Message-ID: %s\r\nSubject: mail-flow alias\r\n\r\n%s\r\n.\r\n' \
+          '{{ alias_message_id }}' '{{ alias_body }}' >&"$smtp_in"
+        exec {smtp_in}>&-
+        smtp_read_expect "FINAL" "250"
+        exec {smtp_out}<&-
+      args:
+        executable: "/bin/bash"
+      register: alias_smtp
+      changed_when: false
+
+    - name: "Waiting for the unique virtual alias delivery"
+      ansible.builtin.shell: |
+        set -o pipefail
+        find '{{ mailbox_new }}' -maxdepth 1 -type f \
+          -exec grep -l -F '{{ alias_message_id }}' {} + |
+          while IFS= read -r file; do
+            if grep -Fq '{{ alias_body }}' "$file"; then
+              printf '%s\n' "$file"
+              break
+            fi
+          done
+      register: alias_file
+      changed_when: false
+      until:
+        - alias_file.rc == 0
+        - alias_file.stdout | trim | length > 0
+      retries: 10
+      delay: 2
+
+    - name: "Reading the unique virtual alias message"
+      ansible.builtin.slurp:
+        src: "{{ alias_file.stdout | trim }}"
+      register: alias_message
+
+    - name: "Rejecting an unknown recipient over an SMTP transaction"
+      ansible.builtin.shell: |
+        {{ smtp_session_helper }}
+        smtp_read_expect "GREETING" "220"
+        smtp_command "EHLO" "250" "EHLO mail-flow.example.org"
+        smtp_command "MAIL FROM" "250" "MAIL FROM:<sender@example.net>"
+        smtp_command "RCPT TO" "550" "RCPT TO:<unknown@mail-flow.example.org>"
+        printf 'QUIT\r\n' >&"$smtp_in"
+        exec {smtp_in}>&-
+        exec {smtp_out}<&-
+      args:
+        executable: "/bin/bash"
+      register: unknown_smtp
+      changed_when: false
+
+    - name: "Accepting a backup MX message over an SMTP transaction"
+      ansible.builtin.shell: |
+        {{ smtp_session_helper }}
+        smtp_read_expect "GREETING" "220"
+        smtp_command "EHLO" "250" "EHLO mail-flow.example.org"
+        smtp_command "MAIL FROM" "250" "MAIL FROM:<sender@example.net>"
+        smtp_command "RCPT TO" "250" \
+          "RCPT TO:<queued@backup.mail-flow.example.org>"
+        smtp_command "DATA" "354" "DATA"
+        printf 'Message-ID: %s\r\nSubject: mail-flow backup MX\r\n\r\n%s\r\n.\r\n' \
+          '{{ queue_message_id }}' '{{ queue_body }}' >&"$smtp_in"
+        exec {smtp_in}>&-
+        smtp_read_expect "FINAL" "250"
+        exec {smtp_out}<&-
+      args:
+        executable: "/bin/bash"
+      register: backup_smtp
+      changed_when: false
+
+    - name: "Extracting the queue ID from the backup SMTP queued response"
+      ansible.builtin.shell: |
+        set -o errexit -o nounset -o pipefail
+        printf '%s\n' '{{ backup_smtp.stdout }}' |
+          sed -nE 's/^QUEUE_ID: ([[:alnum:]]+)$/\1/p'
+      args:
+        executable: "/bin/bash"
+      register: queue_message_queue_id
+      changed_when: false
+      failed_when: queue_message_queue_id.stdout | trim | length == 0
+
+    # The primary MX at 192.0.2.1 intentionally retries delivery.  Therefore
+    # queued acceptance plus postcat identity is the observable result here;
+    # this test does not wait for final remote delivery.
+    - name: >-
+        "Waiting for the uniquely identified backup message in the queue dump"
+      ansible.builtin.command:
+        argv:
+          - "postcat"
+          - "-q"
+          - "{{ queue_message_queue_id.stdout | trim }}"
+      register: queue_dump
+      changed_when: false
+      until:
+        - queue_dump.rc == 0
+        - queue_dump.stdout is search(queue_message_id)
+        - queue_dump.stdout is search(queue_body)
+      retries: 10
+      delay: 2
+
+    - name: "Checking Postfix queue command remains usable"
+      ansible.builtin.command: postqueue -p
+      register: postfix_queue
+      changed_when: false
+
+    - name: "Asserting SMTP transactions and unique delivered message contents"
+      ansible.builtin.assert:
+        that:
+          - mailbox_smtp.rc == 0
+          - mailbox_smtp.stdout is search('EHLO: 250')
+          - mailbox_smtp.stdout is search('MAIL FROM: 250')
+          - mailbox_smtp.stdout is search('RCPT TO: 250')
+          - mailbox_smtp.stdout is search('DATA: 354')
+          - mailbox_smtp.stdout is search('FINAL: 250')
+          - >-
+               mailbox_file.stdout | trim is
+               match('^/var/vmail/mail-flow\\.example\\.org/inbox/new/[^/]+$')
+          - mailbox_message.content | b64decode is search(mailbox_message_id)
+          - mailbox_message.content | b64decode is search(mailbox_body)
+          - alias_smtp.rc == 0
+          - alias_smtp.stdout is search('EHLO: 250')
+          - alias_smtp.stdout is search('MAIL FROM: 250')
+          - alias_smtp.stdout is search('RCPT TO: 250')
+          - alias_smtp.stdout is search('DATA: 354')
+          - alias_smtp.stdout is search('FINAL: 250')
+          - >-
+               alias_file.stdout | trim is
+               match('^/var/vmail/mail-flow\\.example\\.org/inbox/new/[^/]+$')
+          - alias_message.content | b64decode is search(alias_message_id)
+          - alias_message.content | b64decode is search(alias_body)
+          - unknown_smtp.rc == 0
+          - unknown_smtp.stdout is search('EHLO: 250')
+          - unknown_smtp.stdout is search('MAIL FROM: 250')
+          - unknown_smtp.stdout is search('RCPT TO: 550')
+          - backup_smtp.rc == 0
+          - backup_smtp.stdout is search('EHLO: 250')
+          - backup_smtp.stdout is search('MAIL FROM: 250')
+          - backup_smtp.stdout is search('RCPT TO: 250')
+          - backup_smtp.stdout is search('DATA: 354')
+          - backup_smtp.stdout is search('FINAL: 250')
+          - "backup_smtp.stdout is search('QUEUE_ID: [A-Za-z0-9]+')"
+          - queue_message_queue_id.stdout | trim is match('^[A-Za-z0-9]+$')
+          - queue_dump.stdout is search(queue_message_id)
+          - queue_dump.stdout is search(queue_body)
+          - postfix_queue.rc == 0
+        fail_msg: "Postfix SMTP mail-flow verification failed"

@@ -17,6 +17,14 @@
       - postfix_effective_virtual_mailbox_targets | length > 0
     fail_msg: "No virtual mailbox target found for virtual_mailbox_absent"
 
+- name: "Checking virtual mailbox removal stays below the configured base"
+  ansible.builtin.assert:
+    that:
+      - postfix_virtual_mailbox_base is match("^/[^/].*")
+      - postfix_virtual_mailbox_base != "/"
+      - postfix_virtual_mailbox_base | realpath == postfix_virtual_mailbox_base
+    fail_msg: "Virtual mailbox removal requires a clean absolute postfix_virtual_mailbox_base other than /"
+
 - name: "Checking virtual mailbox target entries"
   ansible.builtin.assert:
     that:
@@ -35,7 +43,7 @@
 - name: "Ensuring Postfix virtual mailbox target entries are absent"
   ansible.builtin.lineinfile:
     path: "{{ postfix_virtual_mailbox_maps_path }}"
-    regexp: "^{{ (item.user ~ '@' ~ item.domain) | regex_escape }}\\s+"
+    regexp: "(?i)^{{ (item.user ~ '@' ~ item.domain) | regex_escape }}\\s+"
     state: "absent"
     create: true
     owner: "root"

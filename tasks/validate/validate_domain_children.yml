@@ -1,0 +1,11 @@
+---
+- name: "Checking Postfix domain child list types"
+  ansible.builtin.assert:
+    that:
+      - postfix_domain_record.aliases | default([]) | type_debug == "list"
+      - postfix_domain_record.mailboxes | default([]) | type_debug == "list"
+    fail_msg: "Postfix domain aliases and mailboxes must be lists before record validation"
+  loop: "{{ (iac_blueprint.postfix.virtual_alias_domains | default([])) + (iac_blueprint.postfix.virtual_mailbox_domains | default([])) }}"
+  loop_control:
+    loop_var: postfix_domain_record
+    label: "{{ postfix_domain_record.name | default('missing-domain') }}"

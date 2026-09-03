@@ -36,6 +36,11 @@ jobs:
           ANSIBLE_ROLES_PATH: ..
         run: ansible-lint --profile production
 
+      - name: Lint mail-flow Molecule playbooks
+        env:
+          ANSIBLE_ROLES_PATH: ..
+        run: ansible-lint --profile production molecule/mail-flow/verify.yml molecule/mail-flow/converge.yml
+
   molecule:
     name: Molecule (${{ matrix.scenario }})
     runs-on: ubuntu-latest
@@ -48,6 +53,7 @@ jobs:
           - validation
           - lifecycle
           - lmdb
+          - mail-flow
 
     steps:
       - name: Check out repository
