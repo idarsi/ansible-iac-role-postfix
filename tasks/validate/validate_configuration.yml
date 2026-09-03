@@ -12,7 +12,7 @@
   ansible.builtin.assert:
     that:
       - item.value | type_debug == "str"
-      - item.value.startswith("/")
+      - item.value is match("^/.+")
       - item.value != "/"
       - not (item.value is search("(^|/)\\.\\.?(/|$)"))
     fail_msg: "Postfix path {{ item.key }} must be an absolute path other than /"

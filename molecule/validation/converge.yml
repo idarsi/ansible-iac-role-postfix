@@ -243,6 +243,34 @@
             content: "ok\n"
             mode: "0644"
 
+- name: "Reject relative Postfix managed path"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    postfix_etc_directory: "etc/postfix"
+    iac_blueprint:
+      postfix: {}
+  tasks:
+    - name: "Running validation expecting relative path failure"
+      block:
+        - name: "Applying relative Postfix managed path"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if relative managed path was accepted"
+          ansible.builtin.fail:
+            msg: "Relative Postfix managed path was accepted"
+      rescue:
+        - name: "Checking relative path failure message"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "Postfix path postfix_etc_directory must be an absolute path other than /"
+        - name: "Writing relative-path marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-relative-path.ok
+            content: "ok\n"
+            mode: "0644"
+
 - name: "Reject unsupported Postfix backend"
   hosts: all
   become: false

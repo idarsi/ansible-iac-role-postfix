@@ -14,6 +14,7 @@
         - /tmp/postfix-validation-alias.ok
         - /tmp/postfix-validation-extra-parameters.ok
         - /tmp/postfix-validation-unsafe-domain.ok
+        - /tmp/postfix-validation-relative-path.ok
         - /tmp/postfix-validation-backend.ok
         - /tmp/postfix-validation-newline.ok
         - /tmp/postfix-validation-mailbox-domain-reuse.ok
