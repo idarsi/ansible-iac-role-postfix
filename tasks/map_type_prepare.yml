@@ -14,33 +14,37 @@
   changed_when: false
   failed_when: postfix_supported_map_types.rc != 0
 
-- name: "Setting unsupported Postfix virtual alias map type fallback"
+- name: "Setting unsupported Postfix map type fallback"
   ansible.builtin.set_fact:
     postfix_effective_virtual_alias_maps_type: "unsupported"
+    postfix_effective_map_type: "unsupported"
 
-- name: "Setting configured Postfix virtual alias map type"
+- name: "Setting configured Postfix map type"
   ansible.builtin.set_fact:
-    postfix_effective_virtual_alias_maps_type: "{{ postfix_virtual_alias_maps_type }}"
-  when: postfix_virtual_alias_maps_type != 'auto'
+    postfix_effective_virtual_alias_maps_type: "{{ postfix_map_type }}"
+    postfix_effective_map_type: "{{ postfix_map_type }}"
+  when: postfix_map_type != 'auto'
 
-- name: "Setting hash Postfix virtual alias map type"
+- name: "Setting hash Postfix map type"
   ansible.builtin.set_fact:
     postfix_effective_virtual_alias_maps_type: "hash"
+    postfix_effective_map_type: "hash"
   when:
-    - postfix_virtual_alias_maps_type == 'auto'
+    - postfix_map_type == 'auto'
     - "'hash' in postfix_supported_map_types.stdout_lines"
 
-- name: "Setting LMDB Postfix virtual alias map type"
+- name: "Setting LMDB Postfix map type"
   ansible.builtin.set_fact:
     postfix_effective_virtual_alias_maps_type: "lmdb"
+    postfix_effective_map_type: "lmdb"
   when:
-    - postfix_virtual_alias_maps_type == 'auto'
+    - postfix_map_type == 'auto'
     - "'hash' not in postfix_supported_map_types.stdout_lines"
     - "'lmdb' in postfix_supported_map_types.stdout_lines"
 
-- name: "Checking if Postfix virtual alias map type is supported"
+- name: "Checking if Postfix map type is supported"
   ansible.builtin.assert:
     that:
       - postfix_effective_virtual_alias_maps_type != 'unsupported'
       - postfix_effective_virtual_alias_maps_type in postfix_supported_map_types.stdout_lines
-    fail_msg: "No supported Postfix virtual alias map type found. Supported map types: {{ postfix_supported_map_types.stdout_lines | join(', ') }}"
+    fail_msg: "No supported Postfix map type found. Supported map types: {{ postfix_supported_map_types.stdout_lines | join(', ') }}"

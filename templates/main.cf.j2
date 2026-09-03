@@ -22,12 +22,13 @@ alias_database = hash:/etc/aliases
 {% set alias_domain_names = postfix_virtual_alias_domains | map(attribute='name') | list %}
 {% set configured_alias_domains = postfix_configuration.virtual_alias_domains | default(alias_domain_names) %}
 {% set mailbox_domain_names = postfix_virtual_mailbox_domains | map(attribute='name') | list %}
-{% set configured_mailbox_domains = postfix_configuration.virtual_mailbox_domains | default(mailbox_domain_names) %}
+{% set top_level_mailbox_domain_names = postfix_virtual_mailboxes | map(attribute='address') | map('regex_replace', '^[^@]+@', '') | list %}
+{% set configured_mailbox_domains = ((postfix_configuration.virtual_mailbox_domains | default(mailbox_domain_names)) + top_level_mailbox_domain_names) | unique(case_sensitive=false) | list %}
 {% set backup_domain_names = postfix_backup_mx_domains | map(attribute='name') | list %}
 {% if configured_alias_domains | length > 0 %}
 virtual_alias_domains = {{ configured_alias_domains | join(', ') }}
 {% endif %}
-{% if postfix_virtual_aliases | length > 0 or postfix_virtual_alias_domains | length > 0 or postfix_virtual_mailbox_domains | length > 0 %}
+{% if postfix_virtual_aliases | length > 0 or postfix_virtual_alias_domains | length > 0 or postfix_virtual_mailbox_domains | length > 0 or postfix_virtual_mailboxes | length > 0 %}
 virtual_alias_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_virtual_alias_maps_path }}
 {% endif %}
 {% if configured_mailbox_domains | length > 0 %}

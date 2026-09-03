@@ -6,7 +6,7 @@ driver:
   name: podman
 
 platforms:
-  - name: instance-idarsi-validation
+  - name: instance-idarsi-mail-flow
     image: docker.io/rockylinux/rockylinux:9-ubi-init
     command: /sbin/init
     privileged: true
@@ -24,19 +24,6 @@ provisioner:
     ANSIBLE_LOCAL_TEMP: "/tmp/.ansible/tmp"
     ANSIBLE_REMOTE_TMP: "/tmp"
     ANSIBLE_ROLES_PATH: "${MOLECULE_PROJECT_DIRECTORY}/.."
-
-scenario:
-  test_sequence:
-    - dependency
-    - cleanup
-    - destroy
-    - syntax
-    - create
-    - prepare
-    - converge
-    - verify
-    - cleanup
-    - destroy
 
 verifier:
   name: ansible

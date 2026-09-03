@@ -23,7 +23,7 @@
 - name: "Ensuring Postfix virtual alias target entries are present"
   ansible.builtin.lineinfile:
     path: "{{ postfix_virtual_alias_maps_path }}"
-    regexp: "^{{ item.source | regex_escape }}\\s+"
+    regexp: "(?i)^{{ item.source | regex_escape }}\\s+"
     line: "{{ item.source }} {{ item.destination }}"
     create: true
     owner: "root"

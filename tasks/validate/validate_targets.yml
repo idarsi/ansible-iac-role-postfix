@@ -1,0 +1,48 @@
+---
+- name: "Checking Postfix targeted alias record types"
+  ansible.builtin.assert:
+    that:
+      - item.source is defined
+      - item.source is string
+      - item.destination is defined
+      - item.destination is string
+    fail_msg: "Each postfix.virtual_alias_targets entry must define string source and destination values"
+  loop: "{{ postfix_virtual_alias_targets }}"
+
+- name: "Checking Postfix targeted alias records"
+  ansible.builtin.assert:
+    that:
+      - item.source is defined
+      - item.source is match("^@?[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+(?:@[A-Za-z0-9.-]+)?$")
+      - item.destination is defined
+      - item.destination | string | trim | length > 0
+      - item.source is not search("[\\x00-\\x1f\\x7f]")
+      - item.destination is not search("[\\x00-\\x1f\\x7f]")
+    fail_msg: "Each postfix.virtual_alias_targets entry must define safe values without control characters"
+  loop: "{{ postfix_virtual_alias_targets }}"
+  loop_control:
+    label: "{{ item.source | default('missing-source') }}"
+
+- name: "Checking Postfix targeted mailbox field types"
+  ansible.builtin.assert:
+    that:
+      - item.domain is defined
+      - item.domain is string
+      - item.user is defined
+      - item.user is string
+    fail_msg: "Each postfix.virtual_mailbox_targets entry must define string domain and user values"
+  loop: "{{ postfix_virtual_mailbox_targets }}"
+
+- name: "Checking Postfix targeted mailbox records"
+  ansible.builtin.assert:
+    that:
+      - item.domain is defined
+      - item.domain is match("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")  # noqa yaml[line-length]
+      - item.user is defined
+      - item.user is match("^[A-Za-z0-9][A-Za-z0-9._+-]*$")
+      - item.domain is not search("[\\x00-\\x1f\\x7f]")
+      - item.user is not search("[\\x00-\\x1f\\x7f]")
+    fail_msg: "Each postfix.virtual_mailbox_targets entry must include safe domain and user values"
+  loop: "{{ postfix_virtual_mailbox_targets }}"
+  loop_control:
+    label: "{{ item.user | default('missing-user') }}@{{ item.domain | default('missing-domain') }}"

@@ -1,0 +1,78 @@
+---  # noqa yaml[line-length]
+- name: "Checking Postfix domain record types and names"
+  ansible.builtin.assert:
+    that:
+      - postfix_domain_record.name is defined
+      - postfix_domain_record.name is string
+      - postfix_domain_record.name is match("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")  # noqa yaml[line-length]
+    fail_msg: "Each Postfix domain record requires a valid domain name"
+  loop: "{{ (iac_blueprint.postfix.virtual_alias_domains | default([])) + (iac_blueprint.postfix.virtual_mailbox_domains | default([])) + (iac_blueprint.postfix.backup_mx_domains | default([])) }}"  # noqa yaml[line-length]
+  loop_control:
+    loop_var: postfix_domain_record
+    label: "{{ postfix_domain_record.name | default('missing-domain') }}"
+
+- name: "Preparing effective Postfix domain names"
+  ansible.builtin.set_fact:
+    postfix_effective_alias_domain_names: >-
+      {{ iac_blueprint.postfix.configuration.virtual_alias_domains
+         if iac_blueprint.postfix.configuration.virtual_alias_domains is defined
+         else (iac_blueprint.postfix.virtual_alias_domains | default([])
+         | map(attribute='name') | list) }}
+    postfix_effective_mailbox_domain_names: >-
+      {{ ((iac_blueprint.postfix.configuration.virtual_mailbox_domains
+         if iac_blueprint.postfix.configuration.virtual_mailbox_domains is defined
+         else (iac_blueprint.postfix.virtual_mailbox_domains | default([])
+         | map(attribute='name') | list)) +
+         (iac_blueprint.postfix.virtual_mailboxes | default([])
+         | map(attribute='address') | map('regex_replace', '^[^@]+@', '') | list))
+         | list }}
+    postfix_effective_backup_domain_names: >-
+      {{ iac_blueprint.postfix.backup_mx_domains | default([])
+         | map(attribute='name') | list }}
+
+- name: "Checking Postfix domain names are unique and classes do not overlap"  # noqa yaml[line-length]
+  vars:
+    postfix_alias_domain_names_lower: "{{ postfix_effective_alias_domain_names | map('lower') | list }}"
+    postfix_mailbox_domain_names_lower: "{{ postfix_effective_mailbox_domain_names | map('lower') | list }}"
+    postfix_scoped_mailbox_domain_names_lower: >-
+      {{ (iac_blueprint.postfix.configuration.virtual_mailbox_domains
+         if iac_blueprint.postfix.configuration.virtual_mailbox_domains is defined
+         else (iac_blueprint.postfix.virtual_mailbox_domains | default([])
+         | map(attribute='name') | list)) | map('lower') | list }}
+    postfix_backup_domain_names_lower: "{{ postfix_effective_backup_domain_names | map('lower') | list }}"
+  ansible.builtin.assert:
+    that:
+      - >-  # noqa yaml[line-length]
+        (postfix_alias_domain_names_lower | unique | length
+        == (postfix_effective_alias_domain_names | length))
+      - >-  # noqa yaml[line-length]
+        (postfix_scoped_mailbox_domain_names_lower | unique | length
+        == (postfix_scoped_mailbox_domain_names_lower | length))
+      - >-  # noqa yaml[line-length]
+        (postfix_backup_domain_names_lower | unique | length
+        == (postfix_effective_backup_domain_names | length))
+      - >-  # noqa yaml[line-length]
+        (postfix_alias_domain_names_lower | unique | intersect(postfix_mailbox_domain_names_lower | unique) | length == 0)
+      - >-  # noqa yaml[line-length]
+        (postfix_alias_domain_names_lower | unique | intersect(postfix_backup_domain_names_lower | unique) | length == 0)
+      - >-  # noqa yaml[line-length]
+        (postfix_mailbox_domain_names_lower | unique | intersect(postfix_backup_domain_names_lower | unique) | length == 0)
+    fail_msg: "A Postfix domain may belong to only one domain class; Postfix domain names must be unique"
+
+- name: "Checking Postfix configuration override domains"
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")  # noqa yaml[line-length]
+      - item is not search("[\\x00-\\x1f\\x7f]")
+    fail_msg: "Postfix configuration override domains must be safe domain names without control characters"
+  loop: >-
+    {{ (iac_blueprint.postfix.configuration.virtual_alias_domains | default([]))
+       + (iac_blueprint.postfix.configuration.virtual_mailbox_domains | default([])) }}
+
+- name: "Checking domains derived from top-level mailbox addresses"
+  ansible.builtin.assert:
+    that:
+      - item is match("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")  # noqa yaml[line-length]
+    fail_msg: "Domains derived from top-level virtual mailboxes must be safe domain names"
+  loop: "{{ postfix_effective_mailbox_domain_names }}"

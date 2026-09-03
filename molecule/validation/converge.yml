@@ -1,5 +1,5 @@
 ---
-- name: "Validate a valid Postfix blueprint"
+- name: "Validate a valid Postfix blueprint with default managed paths"
   hosts: all
   become: false
   vars:
@@ -58,7 +58,7 @@
           ansible.builtin.assert:
             that:
               - ansible_failed_result is defined
-              - (ansible_failed_result | to_nice_json) is search("A Postfix domain may belong to only one domain class")
+              - ansible_failed_result.msg == "A Postfix domain may belong to only one domain class; Postfix domain names must be unique"
         - name: "Writing domain overlap marker"
           ansible.builtin.copy:
             dest: /tmp/postfix-validation-overlap.ok
@@ -90,7 +90,7 @@
           ansible.builtin.assert:
             that:
               - ansible_failed_result is defined
-              - (ansible_failed_result | to_nice_json) is search("Each backup MX domain requires name, primary_mx, and recipients")
+              - ansible_failed_result.results[0].msg == "Each backup MX domain requires name, primary_mx, and recipients with no control characters"
         - name: "Writing backup MX marker"
           ansible.builtin.copy:
             dest: /tmp/postfix-validation-backup-mx.ok
@@ -122,7 +122,7 @@
           ansible.builtin.assert:
             that:
               - ansible_failed_result is defined
-              - (ansible_failed_result | to_nice_json) is search("Postfix domain names must be unique")
+              - ansible_failed_result.msg == "A Postfix domain may belong to only one domain class; Postfix domain names must be unique"
         - name: "Writing duplicate domain marker"
           ansible.builtin.copy:
             dest: /tmp/postfix-validation-duplicate.ok
@@ -153,9 +153,347 @@
           ansible.builtin.assert:
             that:
               - ansible_failed_result is defined
-              - (ansible_failed_result | to_nice_json) is search("Each Postfix virtual alias must define source and destination")
+              - (ansible_failed_result.results[0].msg | string) == "Each top-level Postfix virtual alias must define string source and destination values"
         - name: "Writing malformed alias marker"
           ansible.builtin.copy:
             dest: /tmp/postfix-validation-alias.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject protected Postfix extra parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            MYHOSTNAME: "safe"
+  tasks:
+    - name: "Running validation expecting protected parameter failure"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Protected Postfix parameter was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'MYHOSTNAME'"
+        - ansible.builtin.copy:
+            dest: /tmp/postfix-validation-extra-parameters.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject mynetworks override in extra_parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            mynetworks: "0.0.0.0/0"
+  tasks:
+    - name: "Running validation expecting mynetworks guardrail failure"
+      block:
+        - name: "Applying protected mynetworks override"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if mynetworks override was accepted"
+          ansible.builtin.fail:
+            msg: "Protected mynetworks override was accepted"
+      rescue:
+        - name: "Checking mynetworks guardrail failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'mynetworks'"
+        - name: "Writing mynetworks marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-mynetworks.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject unsafe Postfix domain value"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        virtual_mailbox_domains:
+          - name: ".."
+  tasks:
+    - name: "Running validation expecting unsafe domain failure"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Unsafe Postfix values were accepted"
+      rescue:
+        - name: "Checking unsafe domain failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "Each Postfix domain record requires a valid domain name"
+        - name: "Writing unsafe-domain marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-unsafe-domain.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject relative Postfix managed path"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    postfix_etc_directory: "etc/postfix"
+    iac_blueprint:
+      postfix: {}
+  tasks:
+    - name: "Running validation expecting relative path failure"
+      block:
+        - name: "Applying relative Postfix managed path"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if relative managed path was accepted"
+          ansible.builtin.fail:
+            msg: "Relative Postfix managed path was accepted"
+      rescue:
+        - name: "Checking relative path failure message"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "Postfix path postfix_etc_directory must be an absolute path other than /"
+        - name: "Writing relative-path marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-relative-path.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject unsupported Postfix backend"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    postfix_maps_type: "unsupported-lmdb"
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            smtpd_banner: "safe"
+  tasks:
+    - name: "Running validation expecting backend failure"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Unsupported backend was accepted"
+      rescue:
+        - name: "Checking backend failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "postfix_maps_type (or legacy postfix_virtual_alias_maps_type) must be one of auto, hash, or lmdb"
+        - name: "Writing backend marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-backend.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject newline in a Postfix configuration value"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          myhostname: "bad\nvalue"
+  tasks:
+    - name: "Running validation expecting newline failure"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Newline value was accepted"
+      rescue:
+        - name: "Checking newline failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "Postfix scalar configuration fields must be strings without control characters"
+        - name: "Writing newline marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-newline.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject tab in extra_parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters: {smtpd_banner: "bad\tvalue"}
+  tasks:
+    - name: "Validate tab control character"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Tab was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters keys and values must not contain ASCII control characters"
+        - name: "Writing tab marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-tab.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject NUL in extra_parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters: {smtpd_banner: "bad\0value"}
+  tasks:
+    - name: "Validate NUL control character"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "NUL was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters keys and values must not contain ASCII control characters"
+        - name: "Writing NUL marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-nul.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject escape in extra_parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters: {smtpd_banner: "bad\evalue"}
+  tasks:
+    - name: "Validate escape control character"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Escape was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters keys and values must not contain ASCII control characters"
+        - name: "Writing escape marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-escape.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Accept case-only scoped and top-level mailbox domain reuse"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        virtual_mailbox_domains:
+          - name: "Collision.example.org"
+        virtual_mailboxes:
+          - address: "archive@COLLISION.example.org"
+            path: "collision/archive/"
+  tasks:
+    - name: "Validate mailbox domain reuse"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+    - name: "Writing mailbox domain reuse marker"
+      ansible.builtin.copy:
+        dest: /tmp/postfix-validation-mailbox-domain-reuse.ok
+        content: "ok\n"
+        mode: "0644"
+
+- name: "Reject case-only duplicate alias source"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        virtual_aliases:
+          - {source: "Admin@Example.org", destination: "root"}
+          - {source: "admin@example.org", destination: "root"}
+  tasks:
+    - name: "Validate duplicate alias source"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Duplicate alias source was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "Postfix virtual alias sources and mailbox addresses must be unique"
+
+- name: "Reject case-only duplicate mailbox address"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        virtual_mailboxes:
+          - {address: "Archive@Example.org", path: "example/archive/"}
+          - {address: "archive@example.org", path: "example/archive2/"}
+  tasks:
+    - name: "Validate duplicate mailbox address"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Duplicate mailbox address was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "Postfix virtual alias sources and mailbox addresses must be unique"
+
+- name: "Reject whitespace protected extra parameter key"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            "mynetworks ": "0.0.0.0/0"
+  tasks:
+    - name: "Validate whitespace protected key"
+      block:
+        - ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - ansible.builtin.fail:
+            msg: "Whitespace protected key was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'mynetworks '"
+        - name: "Writing whitespace-key marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-whitespace-key.ok
             content: "ok\n"
             mode: "0644"

@@ -12,6 +12,17 @@
         - /tmp/postfix-validation-backup-mx.ok
         - /tmp/postfix-validation-duplicate.ok
         - /tmp/postfix-validation-alias.ok
+        - /tmp/postfix-validation-extra-parameters.ok
+        - /tmp/postfix-validation-unsafe-domain.ok
+        - /tmp/postfix-validation-relative-path.ok
+        - /tmp/postfix-validation-backend.ok
+        - /tmp/postfix-validation-newline.ok
+        - /tmp/postfix-validation-mailbox-domain-reuse.ok
+        - /tmp/postfix-validation-tab.ok
+        - /tmp/postfix-validation-nul.ok
+        - /tmp/postfix-validation-escape.ok
+        - /tmp/postfix-validation-whitespace-key.ok
+        - /tmp/postfix-validation-mynetworks.ok
       register: postfix_validation_markers
 
     - name: "Checking all Postfix validation cases completed"

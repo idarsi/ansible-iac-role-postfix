@@ -1,0 +1,122 @@
+---
+- name: "Checking Postfix map type"
+  ansible.builtin.assert:
+    that:
+      - postfix_map_type is string
+      - postfix_map_type in ["auto", "hash", "lmdb"]
+    fail_msg: >-
+      postfix_maps_type (or legacy postfix_virtual_alias_maps_type) must be one
+      of auto, hash, or lmdb
+
+- name: "Checking Postfix managed paths"
+  ansible.builtin.assert:
+    that:
+      - item.value is string
+      - item.value is match("^/.+")
+      - item.value != "/"
+      - not (item.value is search("(^|/)\\.\\.?(/|$)"))
+    fail_msg: "Postfix path {{ item.key }} must be an absolute path other than /"
+  loop: >-
+    {{ query('dict', {'postfix_etc_directory': postfix_etc_directory,
+       'postfix_main_cf_path': postfix_main_cf_path,
+       'postfix_virtual_mailbox_base': postfix_virtual_mailbox_base,
+       'postfix_virtual_alias_maps_path': postfix_virtual_alias_maps_path,
+       'postfix_virtual_mailbox_maps_path': postfix_virtual_mailbox_maps_path}) }}
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Checking targeted mailbox removal scope"
+  ansible.builtin.assert:
+    that:
+      - postfix_virtual_mailbox_base | regex_replace("/+$", "") not in ["/var", "/home", "/opt"]
+    fail_msg: "Targeted mailbox removal cannot use broad base paths /var, /home, or /opt"
+  when: state == "virtual_mailbox_absent"
+
+- name: "Checking Postfix extra parameter types"
+  ansible.builtin.assert:
+    that:
+      - item.key is string
+      - item.value is string
+    fail_msg: "extra_parameters keys and values must be strings"
+  loop: "{{ query('dict', iac_blueprint.postfix.configuration.extra_parameters | default({})) }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Checking Postfix extra parameter control characters"
+  ansible.builtin.assert:
+    that:
+      - item.key is not search("[\\x00-\\x1f\\x7f]")
+      - item.value is not search("[\\x00-\\x1f\\x7f]")
+    fail_msg: "extra_parameters keys and values must not contain ASCII control characters"
+  loop: "{{ query('dict', iac_blueprint.postfix.configuration.extra_parameters | default({})) }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Checking protected Postfix extra parameters"
+  ansible.builtin.assert:
+    that:
+      - item.key == item.key | trim
+      - item.key | trim | lower not in ["queue_directory", "command_directory", "daemon_directory", "data_directory", "mail_owner", "myhostname", "mydomain", "myorigin", "inet_interfaces", "inet_protocols", "mydestination", "mynetworks", "alias_maps", "alias_database", "virtual_alias_domains", "virtual_alias_maps", "virtual_mailbox_domains", "virtual_mailbox_maps", "virtual_mailbox_base", "virtual_uid_maps", "virtual_gid_maps", "relay_domains", "relay_recipient_maps", "transport_maps", "smtpd_recipient_restrictions", "smtpd_relay_restrictions", "smtpd_authorized_xxxs"]  # noqa yaml[line-length]
+    fail_msg: "extra_parameters cannot override managed or safety-critical main.cf key '{{ item.key }}'"
+  loop: "{{ query('dict', iac_blueprint.postfix.configuration.extra_parameters | default({})) }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Checking Postfix scalar template configuration fields"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix.configuration.myhostname | default("") is string
+      - iac_blueprint.postfix.configuration.mydomain | default("") is string
+      - iac_blueprint.postfix.configuration.myorigin | default("") is string
+      - iac_blueprint.postfix.configuration.inet_interfaces | default("") is string
+      - iac_blueprint.postfix.configuration.inet_protocols | default("") is string
+      - iac_blueprint.postfix.configuration.myhostname | default("") is not search("[\\x00-\\x1f\\x7f]")
+      - iac_blueprint.postfix.configuration.mydomain | default("") is not search("[\\x00-\\x1f\\x7f]")
+      - iac_blueprint.postfix.configuration.myorigin | default("") is not search("[\\x00-\\x1f\\x7f]")
+      - iac_blueprint.postfix.configuration.inet_interfaces | default("") is not search("[\\x00-\\x1f\\x7f]")
+      - iac_blueprint.postfix.configuration.inet_protocols | default("") is not search("[\\x00-\\x1f\\x7f]")
+    fail_msg: "Postfix scalar configuration fields must be strings without control characters"
+
+- name: "Checking Postfix list template configuration fields"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix.configuration.mydestination | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.configuration.mynetworks | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.configuration.smtpd_recipient_restrictions | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.configuration.virtual_alias_domains | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.configuration.virtual_mailbox_domains | default([]) | type_debug == "list"
+      - >-
+        iac_blueprint.postfix.configuration.mydestination | default([])
+        | select('string') | list | length
+        == iac_blueprint.postfix.configuration.mydestination | default([]) | length
+      - iac_blueprint.postfix.configuration.mydestination | default([]) | select('search', '[\\x00-\\x1f\\x7f]') | list | length == 0
+      - iac_blueprint.postfix.configuration.mynetworks | default([]) | select('string') | select('search', '[\\x00-\\x1f\\x7f]') | list | length == 0
+      - >-
+        iac_blueprint.postfix.configuration.mynetworks | default([])
+        | select('string') | list | length
+        == iac_blueprint.postfix.configuration.mynetworks | default([]) | length
+      - >-
+        iac_blueprint.postfix.configuration.smtpd_recipient_restrictions
+        | default([]) | select('string')
+        | select('search', '[\\x00-\\x1f\\x7f]') | list | length == 0
+      - >-
+        iac_blueprint.postfix.configuration.smtpd_recipient_restrictions
+        | default([]) | select('string') | list | length
+        == iac_blueprint.postfix.configuration.smtpd_recipient_restrictions
+        | default([]) | length
+      - iac_blueprint.postfix.configuration.virtual_alias_domains | default([]) | select('string') | select('search', '[\\x00-\\x1f\\x7f]') | list | length == 0
+      - >-
+        iac_blueprint.postfix.configuration.virtual_alias_domains | default([])
+        | select('string') | list | length
+        == iac_blueprint.postfix.configuration.virtual_alias_domains
+        | default([]) | length
+      - >-
+        iac_blueprint.postfix.configuration.virtual_mailbox_domains
+        | default([]) | select('string')
+        | select('search', '[\\x00-\\x1f\\x7f]') | list | length == 0
+      - >-
+        iac_blueprint.postfix.configuration.virtual_mailbox_domains | default([])
+        | select('string') | list | length
+        == iac_blueprint.postfix.configuration.virtual_mailbox_domains
+        | default([]) | length
+    fail_msg: "Postfix list configuration fields must be lists of values without control characters"

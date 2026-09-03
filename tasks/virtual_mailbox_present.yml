@@ -61,7 +61,7 @@
 - name: "Ensuring Postfix virtual mailbox target entries are present"
   ansible.builtin.lineinfile:
     path: "{{ postfix_virtual_mailbox_maps_path }}"
-    regexp: "^{{ (item.user ~ '@' ~ item.domain) | regex_escape }}\\s+"
+    regexp: "(?i)^{{ (item.user ~ '@' ~ item.domain) | regex_escape }}\\s+"
     line: "{{ item.user }}@{{ item.domain }} {{ item.domain }}/{{ item.user }}/"
     create: true
     owner: "root"

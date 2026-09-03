@@ -26,10 +26,36 @@
   when: iac_blueprint is not defined or iac_blueprint.postfix is not defined
 
 ###############################################################################
-# SETTING VARIABLES
+# VALIDATING BLUEPRINT
 ###############################################################################
 
-- name: "Setting what Postfix configuration is to be managed"
+- name: "Validating Postfix blueprint"
+  ansible.builtin.include_tasks: validate/validate_inventory.yml
+
+- name: "Checking that the shared task submodule is available"
+  ansible.builtin.stat:
+    path: "{{ role_path }}/tasks/shared/fs_present.yml"
+  register: postfix_shared_tasks_file
+  delegate_to: "localhost"
+  run_once: true
+  become: false
+  changed_when: false
+  when: state != 'validate'
+
+- name: "Failing when the shared task submodule is missing"
+  ansible.builtin.fail:
+    msg: >-
+      The tasks/shared Git submodule is missing. Initialize the repository with
+      'git submodule update --init --recursive' before running state '{{ state }}'.
+  when:
+    - state != 'validate'
+    - not postfix_shared_tasks_file.stat.exists
+
+###############################################################################
+# NORMALIZING BLUEPRINT
+###############################################################################
+
+- name: "Normalizing Postfix blueprint"
   ansible.builtin.set_fact:
     postfix_configuration: "{{ iac_blueprint.postfix.configuration | default({}) }}"
     postfix_virtual_alias_domains: "{{ iac_blueprint.postfix.virtual_alias_domains | default([]) }}"
@@ -37,51 +63,11 @@
     postfix_backup_mx_domains: "{{ iac_blueprint.postfix.backup_mx_domains | default([]) }}"
     postfix_virtual_aliases: "{{ iac_blueprint.postfix.virtual_aliases | default([]) }}"
     postfix_virtual_mailboxes: "{{ iac_blueprint.postfix.virtual_mailboxes | default([]) }}"
-    postfix_virtual_alias_targets_raw: "{{ iac_blueprint.postfix.virtual_alias_targets | default([]) }}"
-    postfix_virtual_mailbox_targets_raw: "{{ iac_blueprint.postfix.virtual_mailbox_targets | default([]) }}"
+    postfix_map_type: "{{ postfix_maps_type if postfix_maps_type != 'auto' else postfix_virtual_alias_maps_type }}"
 
-- name: "Normalizing Postfix virtual targets"
-  ansible.builtin.set_fact:
-    postfix_virtual_alias_targets: >-
-      {{
-        postfix_virtual_alias_targets_raw
-        if (
-          postfix_virtual_alias_targets_raw is sequence
-          and postfix_virtual_alias_targets_raw is not string
-        )
-        else (
-          (postfix_virtual_alias_targets_raw | from_yaml)
-          if (
-            postfix_virtual_alias_targets_raw is string
-            and postfix_virtual_alias_targets_raw | trim | length > 0
-          )
-          else []
-        )
-      }}
-
-    postfix_virtual_mailbox_targets: >-
-      {{
-        postfix_virtual_mailbox_targets_raw
-        if (
-          postfix_virtual_mailbox_targets_raw is sequence
-          and postfix_virtual_mailbox_targets_raw is not string
-        )
-        else (
-          (postfix_virtual_mailbox_targets_raw | from_yaml)
-          if (
-            postfix_virtual_mailbox_targets_raw is string
-            and postfix_virtual_mailbox_targets_raw | trim | length > 0
-          )
-          else []
-        )
-      }}
-
-###############################################################################
-# VALIDATING BLUEPRINT
-###############################################################################
-
-- name: "Validating Postfix blueprint"
-  ansible.builtin.include_tasks: validate.yml
+- name: "Checking the selected Postfix map backend before host changes"
+  ansible.builtin.include_tasks: map_type_prepare.yml
+  when: state in ["configuration_present", "virtual_alias_present", "virtual_alias_absent", "virtual_mailbox_present", "virtual_mailbox_absent"]
 
 - name: "Checking proxy address if it's defined"
   ansible.builtin.set_fact:

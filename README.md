@@ -79,6 +79,11 @@ backup MX fields. Run validation without changing the host with:
       state: validate
 ```
 
+`postfix_maps_type` is the preferred map backend variable (`auto`, `hash`, or
+`lmdb`). The legacy `postfix_virtual_alias_maps_type` name remains accepted.
+`extra_parameters` cannot override settings managed by this role or
+safety-critical recipient and relay restrictions.
+
 This role manages:
 
 - selected `main.cf` settings through `postfix.configuration`
@@ -173,6 +178,14 @@ map.
 
 The role also supports explicit top-level `virtual_mailboxes` entries with
 `address` and `path` fields when you want to define mailbox map rows directly.
+These entries enable the virtual mailbox map even when no domain-scoped
+mailbox records exist.
+
+`virtual_mailbox_absent` removes only explicitly listed mailbox targets and
+their Maildir directories. `absent` and `uninstall` stop and remove the
+Postfix package; they do not remove the configured mailbox base or unrelated
+mail data. Mailbox removal rejects unsafe base paths, broad bases such as
+`/var`, `/home`, and `/opt`, and path traversal.
 
 Backup MX Domains
 -----------------
