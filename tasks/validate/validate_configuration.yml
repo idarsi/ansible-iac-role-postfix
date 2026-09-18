@@ -1,4 +1,38 @@
 ---
+- name: "Defining protected Postfix extra parameter keys"
+  ansible.builtin.set_fact:
+    postfix_protected_extra_parameter_keys:
+      - "queue_directory"
+      - "command_directory"
+      - "daemon_directory"
+      - "data_directory"
+      - "mail_owner"
+      - "myhostname"
+      - "mydomain"
+      - "myorigin"
+      - "inet_interfaces"
+      - "inet_protocols"
+      - "mydestination"
+      - "mynetworks"
+      - "alias_maps"
+      - "alias_database"
+      - "virtual_alias_domains"
+      - "virtual_alias_maps"
+      - "virtual_mailbox_domains"
+      - "virtual_mailbox_maps"
+      - "virtual_mailbox_base"
+      - "virtual_uid_maps"
+      - "virtual_gid_maps"
+      - "relay_domains"
+      - "relay_recipient_maps"
+      - "transport_maps"
+      - "smtpd_recipient_restrictions"
+      - "smtpd_relay_restrictions"
+      - "smtpd_authorized_xxxs"
+      - "smtpd_tls_security_level"
+      - "smtp_tls_security_level"
+      - "smtp_tls_loglevel"
+
 - name: "Checking Postfix map type"
   ansible.builtin.assert:
     that:
@@ -55,9 +89,29 @@
 - name: "Checking protected Postfix extra parameters"
   ansible.builtin.assert:
     that:
-      - item.key == item.key | trim
-      - item.key | trim | lower not in ["queue_directory", "command_directory", "daemon_directory", "data_directory", "mail_owner", "myhostname", "mydomain", "myorigin", "inet_interfaces", "inet_protocols", "mydestination", "mynetworks", "alias_maps", "alias_database", "virtual_alias_domains", "virtual_alias_maps", "virtual_mailbox_domains", "virtual_mailbox_maps", "virtual_mailbox_base", "virtual_uid_maps", "virtual_gid_maps", "relay_domains", "relay_recipient_maps", "transport_maps", "smtpd_recipient_restrictions", "smtpd_relay_restrictions", "smtpd_authorized_xxxs"]  # noqa yaml[line-length]
+      - "(item.key | regex_replace('^\\s+|\\s+$', '')) == item.key"
+      - "(item.key | regex_replace('^\\s+|\\s+$', '') | lower) not in postfix_protected_extra_parameter_keys"
     fail_msg: "extra_parameters cannot override managed or safety-critical main.cf key '{{ item.key }}'"
+  loop: "{{ query('dict', iac_blueprint.postfix.configuration.extra_parameters | default({})) }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Checking Postfix extra parameter keys cannot inject assignments"
+  ansible.builtin.assert:
+    that:
+      # Let the protected-key check above report protected names, including
+      # names padded with whitespace, instead of masking them with this
+      # generic syntax error.  The protected check still rejects the padded
+      # key, so this exception cannot be used to bypass validation.
+      - >-
+        (item.key | regex_replace('^\\s+|\\s+$', '') | lower) in postfix_protected_extra_parameter_keys
+        or item.key is match("^[A-Za-z][A-Za-z0-9_-]*$")
+      - >-
+        (item.key | regex_replace('^\\s+|\\s+$', '') | lower) in postfix_protected_extra_parameter_keys
+        or "=" not in item.key
+    fail_msg: >-
+      extra_parameters keys must be simple Postfix parameter names and must not
+      contain whitespace, '=' or other assignment syntax: '{{ item.key }}'
   loop: "{{ query('dict', iac_blueprint.postfix.configuration.extra_parameters | default({})) }}"
   loop_control:
     label: "{{ item.key }}"
@@ -75,7 +129,31 @@
       - iac_blueprint.postfix.configuration.myorigin | default("") is not search("[\\x00-\\x1f\\x7f]")
       - iac_blueprint.postfix.configuration.inet_interfaces | default("") is not search("[\\x00-\\x1f\\x7f]")
       - iac_blueprint.postfix.configuration.inet_protocols | default("") is not search("[\\x00-\\x1f\\x7f]")
+      - iac_blueprint.postfix.configuration.smtpd_tls_security_level | default(postfix_default_smtpd_tls_security_level) is string
+      - iac_blueprint.postfix.configuration.smtp_tls_security_level | default(postfix_default_smtp_tls_security_level) is string
+      - iac_blueprint.postfix.configuration.smtpd_tls_security_level | default(postfix_default_smtpd_tls_security_level) is not search("[\\x00-\\x1f\\x7f]")
+      - iac_blueprint.postfix.configuration.smtp_tls_security_level | default(postfix_default_smtp_tls_security_level) is not search("[\\x00-\\x1f\\x7f]")
     fail_msg: "Postfix scalar configuration fields must be strings without control characters"
+
+- name: "Checking Postfix TLS configuration values"
+  ansible.builtin.assert:
+    that:
+      - >-
+        (iac_blueprint.postfix.configuration.smtpd_tls_security_level
+        | default(postfix_default_smtpd_tls_security_level)) in ["none", "may", "encrypt"]
+      - >-
+        (iac_blueprint.postfix.configuration.smtp_tls_security_level
+        | default(postfix_default_smtp_tls_security_level)) in ["none", "may", "encrypt", "dane", "dane-only", "fingerprint", "verify", "secure"]
+      - (iac_blueprint.postfix.configuration.smtp_tls_loglevel | default(postfix_default_smtp_tls_loglevel)) is integer
+      - (iac_blueprint.postfix.configuration.smtp_tls_loglevel | default(postfix_default_smtp_tls_loglevel)) >= 0
+      - (iac_blueprint.postfix.configuration.smtp_tls_loglevel | default(postfix_default_smtp_tls_loglevel)) <= 3
+    fail_msg: "Postfix TLS security levels or smtp_tls_loglevel are invalid"
+
+- name: "Checking Postfix main.cf mode is restrictive"
+  ansible.builtin.assert:
+    that:
+      - postfix_main_cf_mode == "0600"
+    fail_msg: "postfix_main_cf_mode must be 0600 to protect main.cf contents"
 
 - name: "Checking Postfix list template configuration fields"
   ansible.builtin.assert:

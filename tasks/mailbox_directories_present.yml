@@ -4,3 +4,5 @@
 
 - name: "Ensuring Postfix virtual mailbox directories are present"
   ansible.builtin.include_tasks: fs_present.yml
+  vars:
+    iac_fs_files: []

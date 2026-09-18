@@ -79,8 +79,10 @@
     dest: "{{ postfix_main_cf_path }}"
     owner: "root"
     group: "root"
-    mode: "0644"
+    mode: "{{ postfix_main_cf_mode }}"
   register: postfix_main_cf
+  diff: false
+  notify: "Restart Postfix for listener configuration changes"
 
 - name: "Checking Postfix virtual alias map database"
   ansible.builtin.stat:
@@ -235,7 +237,7 @@
     state: "reloaded"
   when:
     - >-
-      postfix_main_cf.changed or postfix_virtual_alias_map.changed or
+      postfix_virtual_alias_map.changed or
       postfix_virtual_mailbox_map.changed or
       (postfix_backup_mx_domains | length > 0 and
       (postfix_relay_recipient_map.changed or postfix_transport_map.changed))

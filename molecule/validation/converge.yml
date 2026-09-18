@@ -173,15 +173,19 @@
   tasks:
     - name: "Running validation expecting protected parameter failure"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying protected Postfix parameter validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if protected Postfix parameter was accepted"
+          ansible.builtin.fail:
             msg: "Protected Postfix parameter was accepted"
       rescue:
-        - ansible.builtin.assert:
+        - name: "Checking protected parameter failure message"
+          ansible.builtin.assert:
             that:
               - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'MYHOSTNAME'"
-        - ansible.builtin.copy:
+        - name: "Writing protected parameter marker"
+          ansible.builtin.copy:
             dest: /tmp/postfix-validation-extra-parameters.ok
             content: "ok\n"
             mode: "0644"
@@ -228,9 +232,11 @@
   tasks:
     - name: "Running validation expecting unsafe domain failure"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying unsafe Postfix value validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if unsafe Postfix value was accepted"
+          ansible.builtin.fail:
             msg: "Unsafe Postfix values were accepted"
       rescue:
         - name: "Checking unsafe domain failure"
@@ -285,9 +291,11 @@
   tasks:
     - name: "Running validation expecting backend failure"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying unsupported backend validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if unsupported backend was accepted"
+          ansible.builtin.fail:
             msg: "Unsupported backend was accepted"
       rescue:
         - name: "Checking backend failure"
@@ -312,9 +320,11 @@
   tasks:
     - name: "Running validation expecting newline failure"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying newline configuration validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if newline configuration value was accepted"
+          ansible.builtin.fail:
             msg: "Newline value was accepted"
       rescue:
         - name: "Checking newline failure"
@@ -339,12 +349,15 @@
   tasks:
     - name: "Validate tab control character"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying tab control character validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if tab control character was accepted"
+          ansible.builtin.fail:
             msg: "Tab was accepted"
       rescue:
-        - ansible.builtin.assert:
+        - name: "Checking tab control character failure"
+          ansible.builtin.assert:
             that:
               - ansible_failed_result.results[0].msg == "extra_parameters keys and values must not contain ASCII control characters"
         - name: "Writing tab marker"
@@ -365,12 +378,15 @@
   tasks:
     - name: "Validate NUL control character"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying NUL control character validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if NUL control character was accepted"
+          ansible.builtin.fail:
             msg: "NUL was accepted"
       rescue:
-        - ansible.builtin.assert:
+        - name: "Checking NUL control character failure"
+          ansible.builtin.assert:
             that:
               - ansible_failed_result.results[0].msg == "extra_parameters keys and values must not contain ASCII control characters"
         - name: "Writing NUL marker"
@@ -391,12 +407,15 @@
   tasks:
     - name: "Validate escape control character"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying escape control character validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if escape control character was accepted"
+          ansible.builtin.fail:
             msg: "Escape was accepted"
       rescue:
-        - ansible.builtin.assert:
+        - name: "Checking escape control character failure"
+          ansible.builtin.assert:
             that:
               - ansible_failed_result.results[0].msg == "extra_parameters keys and values must not contain ASCII control characters"
         - name: "Writing escape marker"
@@ -440,12 +459,15 @@
   tasks:
     - name: "Validate duplicate alias source"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying duplicate alias source validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if duplicate alias source was accepted"
+          ansible.builtin.fail:
             msg: "Duplicate alias source was accepted"
       rescue:
-        - ansible.builtin.assert:
+        - name: "Checking duplicate alias source failure"
+          ansible.builtin.assert:
             that:
               - ansible_failed_result.msg == "Postfix virtual alias sources and mailbox addresses must be unique"
 
@@ -462,12 +484,15 @@
   tasks:
     - name: "Validate duplicate mailbox address"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying duplicate mailbox address validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if duplicate mailbox address was accepted"
+          ansible.builtin.fail:
             msg: "Duplicate mailbox address was accepted"
       rescue:
-        - ansible.builtin.assert:
+        - name: "Checking duplicate mailbox address failure"
+          ansible.builtin.assert:
             that:
               - ansible_failed_result.msg == "Postfix virtual alias sources and mailbox addresses must be unique"
 
@@ -484,16 +509,254 @@
   tasks:
     - name: "Validate whitespace protected key"
       block:
-        - ansible.builtin.include_role:
+        - name: "Applying whitespace protected key validation"
+          ansible.builtin.include_role:
             name: ansible-iac-role-postfix
-        - ansible.builtin.fail:
+        - name: "Failing if whitespace protected key was accepted"
+          ansible.builtin.fail:
             msg: "Whitespace protected key was accepted"
       rescue:
-        - ansible.builtin.assert:
+        - name: "Checking whitespace protected key failure"
+          ansible.builtin.assert:
             that:
               - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'mynetworks '"
         - name: "Writing whitespace-key marker"
           ansible.builtin.copy:
             dest: /tmp/postfix-validation-whitespace-key.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject assignment syntax in extra parameter key"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            "smtpd_banner = evil": "accepted"
+  tasks:
+    - name: "Validate assignment injection guard"
+      block:
+        - name: "Applying assignment syntax validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if assignment syntax was accepted"
+          ansible.builtin.fail:
+            msg: "Assignment syntax in extra parameter key was accepted"
+      rescue:
+        - name: "Checking assignment syntax failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg is search("extra_parameters keys must be simple Postfix parameter names")
+        - name: "Writing assignment syntax marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-assignment-key.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject invalid Postfix TLS security level"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          smtpd_tls_security_level: "always"
+  tasks:
+    - name: "Validate TLS security level guardrail"
+      block:
+        - name: "Applying TLS security level validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if invalid TLS security level was accepted"
+          ansible.builtin.fail:
+            msg: "Invalid TLS security level was accepted"
+      rescue:
+        - name: "Checking TLS security level failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "Postfix TLS security levels or smtp_tls_loglevel are invalid"
+        - name: "Writing TLS security level marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-tls-level.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject control characters in Postfix TLS configuration"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          smtp_tls_security_level: "may\n"
+  tasks:
+    - name: "Validate TLS control character guardrail"
+      block:
+        - name: "Applying TLS control character validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if TLS control character was accepted"
+          ansible.builtin.fail:
+            msg: "TLS control character was accepted"
+      rescue:
+        - name: "Checking TLS control character failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "Postfix scalar configuration fields must be strings without control characters"
+        - name: "Writing TLS control character marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-tls-control.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject out-of-range Postfix TLS log level"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          smtp_tls_loglevel: 4
+  tasks:
+    - name: "Validate TLS log level guardrail"
+      block:
+        - name: "Applying TLS log level validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if invalid TLS log level was accepted"
+          ansible.builtin.fail:
+            msg: "Invalid TLS log level was accepted"
+      rescue:
+        - name: "Checking TLS log level failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "Postfix TLS security levels or smtp_tls_loglevel are invalid"
+        - name: "Writing TLS log level marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-tls-loglevel.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject non-restrictive Postfix main.cf mode"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    postfix_main_cf_mode: "0644"
+    iac_blueprint:
+      postfix: {}
+  tasks:
+    - name: "Validate main.cf mode guardrail"
+      block:
+        - name: "Applying main.cf mode validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if non-restrictive main.cf mode was accepted"
+          ansible.builtin.fail:
+            msg: "Non-restrictive main.cf mode was accepted"
+      rescue:
+        - name: "Checking main.cf mode failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == "postfix_main_cf_mode must be 0600 to protect main.cf contents"
+        - name: "Writing main.cf mode marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-main-cf-mode.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject smtpd TLS security level override in extra_parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            smtpd_tls_security_level: "none"
+  tasks:
+    - name: "Validate smtpd TLS override guardrail"
+      block:
+        - name: "Applying smtpd TLS override validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if smtpd TLS override was accepted"
+          ansible.builtin.fail:
+            msg: "smtpd TLS security level override was accepted"
+      rescue:
+        - name: "Checking smtpd TLS override failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'smtpd_tls_security_level'"
+        - name: "Writing smtpd TLS override marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-smtpd-tls-override.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject smtp TLS security level override in extra_parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            smtp_tls_security_level: "none"
+  tasks:
+    - name: "Validate smtp TLS override guardrail"
+      block:
+        - name: "Applying smtp TLS override validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if smtp TLS override was accepted"
+          ansible.builtin.fail:
+            msg: "smtp TLS security level override was accepted"
+      rescue:
+        - name: "Checking smtp TLS override failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'smtp_tls_security_level'"
+        - name: "Writing smtp TLS override marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-smtp-tls-override.ok
+            content: "ok\n"
+            mode: "0644"
+
+- name: "Reject smtp TLS log level override in extra_parameters"
+  hosts: all
+  become: false
+  vars:
+    state: validate
+    iac_blueprint:
+      postfix:
+        configuration:
+          extra_parameters:
+            smtp_tls_loglevel: "3"
+  tasks:
+    - name: "Validate smtp TLS log level guardrail"
+      block:
+        - name: "Applying smtp TLS log level validation"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if smtp TLS log level override was accepted"
+          ansible.builtin.fail:
+            msg: "smtp TLS log level override was accepted"
+      rescue:
+        - name: "Checking smtp TLS log level override failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "extra_parameters cannot override managed or safety-critical main.cf key 'smtp_tls_loglevel'"
+        - name: "Writing smtp TLS log level override marker"
+          ansible.builtin.copy:
+            dest: /tmp/postfix-validation-smtp-tls-loglevel-override.ok
             content: "ok\n"
             mode: "0644"

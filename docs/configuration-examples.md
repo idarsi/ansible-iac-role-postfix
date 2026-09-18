@@ -2,8 +2,9 @@
 
 This document collects fuller inventory examples for the Postfix role.
 
-The role's task-report logging and Maildir directory operations use the shared
-task library under `tasks/shared`.
+The role's Maildir directory operations use the shared task library under
+`tasks/shared`. Task-report logging uses the role-local
+`tasks/log_write.yml` implementation.
 
 ## Main Configuration With Extra Parameters
 

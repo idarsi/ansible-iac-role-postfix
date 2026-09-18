@@ -11,5 +11,17 @@
 # WRITING LOGS
 ###############################################################################
 
-- name: "Writing task log through shared tasks"
-  ansible.builtin.include_tasks: shared/log_write.yml
+- name: "Appending task log record"
+  ansible.builtin.shell: >-
+    printf '%s\n' {{ iac_task_log_record | quote }}
+    >> {{ iac_ansible_report_tasks_path | quote }}
+  register: iac_log_write_output
+  changed_when: false
+  failed_when: iac_log_write_output.rc != 0
+  when: iac_ansible_report | bool
+  no_log: true
+  vars:
+    iac_task_log_record: >-
+      {{ ansible_date_time.iso8601 }}
+      {{ ansible_facts['ssh_user'] | default(lookup('env', 'USER')) }}
+      {{ iac_service_name }} {{ iac_log_write }}

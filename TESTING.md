@@ -29,11 +29,14 @@ executed by the Molecule matrix.
   class overlap, incomplete backup MX records, duplicates, malformed records,
   unsafe domains, case-insensitive protected parameters, unsupported backends,
   case-insensitive record/domain identity checks, whitespace-protected keys,
-  and control-character injection fail with explicit messages before any
+  assignment-syntax extra parameter keys,
+  TLS configuration overrides, and control-character injection fail with explicit messages before any
   Postfix package or service work is attempted. The valid blueprint also
   covers successful backup MX validation.
 - `molecule/lifecycle` exercises targeted alias/mailbox states and the
-  started/stopped/restarted/absent/uninstall service lifecycle.
+  started/stopped/restarted/absent/uninstall service lifecycle. It also checks
+  mailbox symlink removal refusal and isolation from caller-provided
+  `iac_fs_files` records.
 - `molecule/lmdb` repeats the default scenario with LMDB map databases.
 - `molecule/mail-flow` uses SMTP against the running Postfix service to verify
   virtual mailbox delivery into Maildir `new/`, virtual alias delivery to the

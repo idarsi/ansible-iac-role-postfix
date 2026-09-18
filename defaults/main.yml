@@ -83,3 +83,11 @@ postfix_default_mynetworks:
 postfix_default_smtpd_recipient_restrictions:
   - "permit_mynetworks"
   - "reject_unauth_destination"
+
+# Opportunistic TLS is enabled by default for inbound and outbound SMTP.  The
+# role deliberately does not provision certificates; operators must provide a
+# trusted certificate/key and review whether their policy requires `encrypt`.
+postfix_default_smtpd_tls_security_level: "may"
+postfix_default_smtp_tls_security_level: "may"
+postfix_default_smtp_tls_loglevel: 1
+postfix_main_cf_mode: "0600"

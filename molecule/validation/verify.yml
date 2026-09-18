@@ -23,6 +23,14 @@
         - /tmp/postfix-validation-escape.ok
         - /tmp/postfix-validation-whitespace-key.ok
         - /tmp/postfix-validation-mynetworks.ok
+        - /tmp/postfix-validation-assignment-key.ok
+        - /tmp/postfix-validation-tls-level.ok
+        - /tmp/postfix-validation-tls-control.ok
+        - /tmp/postfix-validation-tls-loglevel.ok
+        - /tmp/postfix-validation-main-cf-mode.ok
+        - /tmp/postfix-validation-smtpd-tls-override.ok
+        - /tmp/postfix-validation-smtp-tls-override.ok
+        - /tmp/postfix-validation-smtp-tls-loglevel-override.ok
       register: postfix_validation_markers
 
     - name: "Checking all Postfix validation cases completed"

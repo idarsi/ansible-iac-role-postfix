@@ -1,3 +1,12 @@
+> **Maturity State: Beta**<br>
+> **RC Readiness: 77%**
+>
+> Assessment: current working tree (uncommitted changes); the executable role has broad
+> blueprint validation, lifecycle guardrails, functional Molecule scenarios,
+> and production-profile CI configuration. RC blockers are unverified CI at
+> this ref, untested claimed RHEL 9/10 support, incomplete role metadata, and
+> limited check-mode/TLS evidence.
+
 ANSIBLE-IAC-ROLE-POSTFIX
 ========================
 **COPYRIGHT** 2026 ^(ida|arsi)$ collective  
@@ -105,6 +114,16 @@ This role does not currently manage:
 
 See [docs/configuration-examples.md](docs/configuration-examples.md) for fuller inventory examples.
 
+The role configures opportunistic TLS only (`smtpd_tls_security_level` and
+`smtp_tls_security_level` default to `may`); it does not test functional TLS
+handshakes or provision certificates, private keys, or trust policy. Operators
+remain responsible for installing restrictive certificate/key files, selecting
+`encrypt` where required, and reviewing firewall and listener exposure.
+Certificate, private-key, and firewall risks therefore remain unless functional
+TLS is tested outside this role. `main.cf` is enforced at mode `0600` so
+secret-bearing `extra_parameters` do not become world-readable or appear in
+Ansible diffs.
+
 Example:
 
 ```yaml
@@ -207,8 +226,9 @@ Shared Task Helpers
 -------------------
 
 The role includes the shared task library under `tasks/shared`. Postfix uses
-the shared wrappers for task-report logging and for creating or removing the
-Maildir directory tree. The directory records are derived automatically from
+the shared wrappers for creating or removing the Maildir directory tree.
+Task-report logging uses the role-local `tasks/log_write.yml` implementation.
+The directory records are derived automatically from
 `virtual_mailbox_domains[].mailboxes`:
 
 ```yaml

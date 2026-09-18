@@ -1,0 +1,10 @@
+---
+- name: "Restart Postfix for listener configuration changes"
+  ansible.builtin.systemd:
+    name: "{{ postfix_service_name }}"
+    state: "restarted"
+  when:
+    - state | default("") not in ["uninstall", "absent"]
+    - ansible_facts.services is defined
+    - ansible_facts.services[postfix_service_name ~ '.service'] is defined
+    - ansible_facts.services[postfix_service_name ~ '.service'].state == 'running'

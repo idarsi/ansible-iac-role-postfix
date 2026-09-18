@@ -39,6 +39,11 @@
       register: postfix_effective_config
       changed_when: false
 
+    - name: "Checking restrictive Postfix configuration permissions"
+      ansible.builtin.stat:
+        path: /etc/postfix/main.cf
+      register: postfix_main_cf_stat
+
     - name: "Reading effective Postfix map type"
       ansible.builtin.command: postconf -h virtual_mailbox_maps
       register: postfix_map_type
@@ -120,6 +125,9 @@
           - postfix_effective_config.stdout is search('virtual_alias_domains = aliases.molecule.example.org')
           - postfix_effective_config.stdout is search('virtual_mailbox_domains = molecule.example.org')
           - postfix_effective_config.stdout is search('relay_domains = backup.molecule.example.org')
+          - postfix_effective_config.stdout is search('smtpd_tls_security_level = may')
+          - postfix_effective_config.stdout is search('smtp_tls_security_level = may')
+          - postfix_main_cf_stat.stat.mode == '0600'
           - postfix_map_type.stdout is search('^(hash|lmdb):/etc/postfix/vmailbox$')
           - postfix_effective_config.stdout is search('relay_recipient_maps = (hash|lmdb):/etc/postfix/relay_recipients')
           - postfix_effective_config.stdout is search('transport_maps = (hash|lmdb):/etc/postfix/transport')

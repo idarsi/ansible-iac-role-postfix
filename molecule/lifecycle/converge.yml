@@ -68,6 +68,9 @@
         name: ansible-iac-role-postfix
       vars:
         state: virtual_mailbox_present
+        iac_fs_files:
+          - path: "/tmp/postfix-shared-leak-sentinel"
+            content: "shared filesystem leak sentinel\n"
         iac_blueprint:
           postfix:
             virtual_mailbox_targets:
@@ -82,13 +85,128 @@
     - name: "Asserting targeted virtual mailbox creation"
       ansible.builtin.assert:
         that:
-          - postfix_mailbox_present_check.stat.isdir
+           - postfix_mailbox_present_check.stat.isdir
+
+    - name: "Checking shared filesystem file records remain isolated"
+      ansible.builtin.stat:
+        path: /tmp/postfix-shared-leak-sentinel
+      register: postfix_shared_leak_sentinel
+
+    - name: "Asserting shared filesystem file records were not consumed"
+      ansible.builtin.assert:
+        that:
+          - not postfix_shared_leak_sentinel.stat.exists
+
+    - name: "Rejecting traversal in the mailbox removal base"
+      block:
+        - name: "Attempting mailbox removal with a traversal base"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+          vars:
+            state: virtual_mailbox_absent
+            postfix_virtual_mailbox_base: "/var/vmail/../etc"
+            iac_blueprint:
+              postfix:
+                virtual_mailbox_targets:
+                  - domain: "lifecycle.example.org"
+                    user: "traversal"
+        - ansible.builtin.fail:
+            msg: "Mailbox traversal removal was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - (ansible_failed_result | to_json) is search("Postfix path postfix_virtual_mailbox_base must be an absolute path other than /")
+
+    - name: "Creating disposable symlink sentinel file"
+      ansible.builtin.copy:
+        content: "postfix symlink sentinel\n"
+        dest: "/tmp/postfix-symlink-sentinel"
+        mode: "0600"
+
+    - name: "Creating a symlink in the mailbox removal path"
+      ansible.builtin.file:
+        src: /tmp/postfix-symlink-sentinel
+        dest: /var/vmail/lifecycle.example.org/symlinked
+        state: link
+
+    - name: "Rejecting mailbox removal through a symlink"
+      block:
+        - name: "Attempting symlink mailbox removal"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+          vars:
+            state: virtual_mailbox_absent
+            iac_blueprint:
+              postfix:
+                virtual_mailbox_targets:
+                  - domain: "lifecycle.example.org"
+                    user: "symlinked"
+        - ansible.builtin.fail:
+            msg: "Mailbox symlink removal was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - (ansible_failed_result | to_json) is search("Refusing to remove mailbox path through a symlink")
+
+    - name: "Removing the mailbox path symlink fixture"
+      ansible.builtin.file:
+        path: /var/vmail/lifecycle.example.org/symlinked
+        state: absent
+
+    - name: "Removing disposable symlink sentinel file"
+      ansible.builtin.file:
+        path: "/tmp/postfix-symlink-sentinel"
+        state: absent
+
+    - name: "Creating disposable intermediate symlink sentinel file"
+      ansible.builtin.copy:
+        content: "postfix intermediate symlink sentinel\n"
+        dest: "/tmp/postfix-intermediate-symlink-sentinel"
+        mode: "0600"
+
+    - name: "Creating an intermediate mailbox path symlink fixture"
+      ansible.builtin.file:
+        src: /tmp/postfix-intermediate-symlink-sentinel
+        dest: /var/vmail/lifecycle.example.org/intermediate
+        state: link
+
+    - name: "Rejecting mailbox removal through an intermediate symlink"
+      block:
+        - name: "Attempting intermediate symlink mailbox removal"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+          vars:
+            state: virtual_mailbox_absent
+            iac_blueprint:
+              postfix:
+                virtual_mailbox_targets:
+                  - domain: "lifecycle.example.org"
+                    user: "intermediate"
+        - ansible.builtin.fail:
+            msg: "Intermediate mailbox symlink removal was accepted"
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - (ansible_failed_result | to_json) is search("Refusing to remove mailbox path through a symlink")
+
+    - name: "Removing the intermediate mailbox path symlink fixture"
+      ansible.builtin.file:
+        path: /var/vmail/lifecycle.example.org/intermediate
+        state: absent
+
+    - name: "Removing disposable intermediate symlink sentinel file"
+      ansible.builtin.file:
+        path: "/tmp/postfix-intermediate-symlink-sentinel"
+        state: absent
 
     - name: "Removing the targeted virtual mailbox"
       ansible.builtin.include_role:
         name: ansible-iac-role-postfix
       vars:
         state: virtual_mailbox_absent
+        iac_fs_files:
+          - path: "/tmp/postfix-shared-leak-sentinel-absent"
+            content: "shared filesystem absent-state leak sentinel\n"
         iac_blueprint:
           postfix:
             virtual_mailbox_targets:
@@ -104,6 +222,16 @@
       ansible.builtin.assert:
         that:
           - not postfix_mailbox_absent_check.stat.exists
+
+    - name: "Checking absent-state shared filesystem file records remain isolated"
+      ansible.builtin.stat:
+        path: /tmp/postfix-shared-leak-sentinel-absent
+      register: postfix_shared_leak_absent_sentinel
+
+    - name: "Asserting absent-state shared filesystem file records were not consumed"
+      ansible.builtin.assert:
+        that:
+          - not postfix_shared_leak_absent_sentinel.stat.exists
 
     - name: "Stopping Postfix"
       ansible.builtin.include_role:

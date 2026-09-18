@@ -45,6 +45,9 @@ transport_maps = {{ postfix_effective_virtual_alias_maps_type }}:{{ postfix_tran
 {% endif %}
 
 smtpd_recipient_restrictions = {{ postfix_configuration.smtpd_recipient_restrictions | default(postfix_default_smtpd_recipient_restrictions) | join(', ') }}
+smtpd_tls_security_level = {{ postfix_configuration.smtpd_tls_security_level | default(postfix_default_smtpd_tls_security_level) }}
+smtp_tls_security_level = {{ postfix_configuration.smtp_tls_security_level | default(postfix_default_smtp_tls_security_level) }}
+smtp_tls_loglevel = {{ postfix_configuration.smtp_tls_loglevel | default(postfix_default_smtp_tls_loglevel) }}
 
 {% for key, value in postfix_configuration.extra_parameters | default({}) | dictsort %}
 {{ key }} = {{ value }}

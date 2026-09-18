@@ -42,8 +42,11 @@ the shared task only through a small wrapper when the shared contract applies.
 
 Current shared-task use covers:
 
-- task-report logging through `tasks/log_write.yml`
 - Maildir directory creation and removal through the filesystem wrappers
+
+Task-report logging is implemented locally in `tasks/log_write.yml`; preserve
+its append-only record format and shell-quoted content and path when changing
+it.
 
 Do not add generic `cron`, `git`, or bind-mount inventory fields to Postfix
 unless Postfix gains a clear responsibility for them. Shared-task changes

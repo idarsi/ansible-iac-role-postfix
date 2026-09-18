@@ -2,6 +2,9 @@
 - name: "Initializing Postfix virtual mailbox directory records"
   ansible.builtin.set_fact:
     iac_fs_directories: []
+    # Shared filesystem tasks also consume iac_fs_files.  Reset it at this
+    # boundary so records from a caller or an earlier role cannot be acted on.
+    iac_fs_files: []
 
 - name: "Adding Postfix virtual mailbox directories"
   ansible.builtin.set_fact:

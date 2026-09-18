@@ -2,5 +2,96 @@
 - name: "Preparing Postfix virtual mailbox directories"
   ansible.builtin.include_tasks: mailbox_directories_prepare.yml
 
-- name: "Ensuring Postfix virtual mailbox directories are absent"
-  ansible.builtin.include_tasks: fs_absent.yml
+- name: "Preparing remote mailbox removal path checks"
+  ansible.builtin.set_fact:
+    postfix_mailbox_removal_check_paths:
+      - "{{ postfix_virtual_mailbox_base | regex_replace('/+$', '') }}"
+
+- name: "Adding mailbox domain and user components to remote path checks"
+  ansible.builtin.set_fact:
+    postfix_mailbox_removal_check_paths: >-
+      {{ postfix_mailbox_removal_check_paths + [
+        postfix_virtual_mailbox_base | regex_replace('/+$', '') ~ '/' ~ postfix_mailbox_target.domain,
+        postfix_virtual_mailbox_base | regex_replace('/+$', '') ~ '/' ~ postfix_mailbox_target.domain ~ '/' ~ postfix_mailbox_target.user
+      ] }}
+  loop: "{{ postfix_mailbox_directory_targets | default([]) }}"
+  loop_control:
+    loop_var: postfix_mailbox_target
+
+- name: "Adding mailbox targets to remote path checks"
+  ansible.builtin.set_fact:
+    postfix_mailbox_removal_check_paths: "{{ postfix_mailbox_removal_check_paths + (iac_fs_directories | default([]) | map(attribute='path') | list) }}"
+
+- name: "Resolving the mailbox base path on the managed host"
+  ansible.builtin.command:
+    argv:
+      - "realpath"
+      - "-m"
+      - "--"
+      - "{{ postfix_virtual_mailbox_base }}"
+  register: postfix_mailbox_base_realpath
+  changed_when: false
+  check_mode: false
+
+- name: "Refusing an unsafe canonical mailbox base"
+  ansible.builtin.assert:
+    that:
+      - postfix_mailbox_base_realpath.rc == 0
+      - postfix_mailbox_base_realpath.stdout | trim == (postfix_virtual_mailbox_base | regex_replace('/+$', '') | regex_replace('/+', '/'))
+    fail_msg: "Refusing to remove mailbox paths through a symlink or non-canonical mailbox base: {{ postfix_virtual_mailbox_base }}"
+
+- name: "Setting canonical mailbox base"
+  ansible.builtin.set_fact:
+    postfix_mailbox_canonical_base: "{{ postfix_mailbox_base_realpath.stdout | trim }}"
+
+- name: "Resolving mailbox removal targets on the managed host"
+  ansible.builtin.command:
+    argv:
+      - "realpath"
+      - "-m"
+      - "--"
+      - "{{ item.path }}"
+  loop: "{{ iac_fs_directories | default([]) }}"
+  register: postfix_mailbox_target_realpaths
+  changed_when: false
+  check_mode: false
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: "Refusing mailbox removal outside the canonical base or through a symlink"
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - item.stdout | trim is search('^' ~ (postfix_mailbox_canonical_base | regex_escape) ~ '/')
+      - item.stdout | trim == (item.item.path | regex_replace('/+', '/') | regex_replace('/+$', ''))
+    fail_msg: "Refusing to remove mailbox path through a symlink or outside the canonical mailbox base: {{ item.item.path }}"
+  loop: "{{ postfix_mailbox_target_realpaths.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: "Checking mailbox removal paths and components are not symlinks"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop: "{{ postfix_mailbox_removal_check_paths | unique | list }}"
+  register: postfix_mailbox_removal_stats
+  loop_control:
+    label: "{{ item }}"
+
+- name: "Refusing mailbox removal through a symlink"
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.islnk | default(false))
+    fail_msg: "Refusing to remove mailbox path through a symlink: {{ item.item }}"
+  loop: "{{ postfix_mailbox_removal_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: "Removing only the validated Postfix mailbox directories"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: "absent"
+  loop: "{{ iac_fs_directories | default([]) }}"
+  when: not (postfix_mailbox_directories_validate_only | default(false) | bool)
+  loop_control:
+    label: "{{ item.path }}"
