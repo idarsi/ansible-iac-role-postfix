@@ -26,6 +26,14 @@
   roles:
     - role: ansible-iac-role-postfix
   tasks:
+    - name: "Checking configuration convergence in check mode"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+        apply:
+          check_mode: true
+      vars:
+        state: configuration_present
+
     - name: "Adding a targeted virtual alias"
       ansible.builtin.include_role:
         name: ansible-iac-role-postfix
@@ -85,7 +93,7 @@
     - name: "Asserting targeted virtual mailbox creation"
       ansible.builtin.assert:
         that:
-           - postfix_mailbox_present_check.stat.isdir
+          - postfix_mailbox_present_check.stat.isdir
 
     - name: "Checking shared filesystem file records remain isolated"
       ansible.builtin.stat:
@@ -250,7 +258,19 @@
         that:
           - postfix_stopped_check.rc != 0
 
+    - name: "Ensuring repeated stopped transition is idempotent"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: stopped
+
     - name: "Starting Postfix"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: started
+
+    - name: "Ensuring repeated started transition is idempotent"
       ansible.builtin.include_role:
         name: ansible-iac-role-postfix
       vars:
@@ -305,3 +325,36 @@
       ansible.builtin.assert:
         that:
           - postfix_package_uninstall_check.rc != 0
+
+    - name: "Checking uninstall preserved existing mailbox data"
+      ansible.builtin.stat:
+        path: /var/vmail/lifecycle.example.org/info
+      register: postfix_mailbox_data_after_uninstall
+
+    - name: "Asserting uninstall preserved mailbox data"
+      ansible.builtin.assert:
+        that:
+          - postfix_mailbox_data_after_uninstall.stat.isdir
+
+- name: "Verify omitted state defaults to present"
+  hosts: all
+  become: false
+  tasks:
+    - name: "Ensuring omitted state uses the present default"
+      ansible.builtin.include_role:
+        name: ansible-iac-role-postfix
+      vars:
+        state: "{{ undef() }}"
+        iac_blueprint:
+          postfix: {}
+
+    - name: "Checking default-state recovery installed Postfix"
+      ansible.builtin.command: rpm -q postfix  # noqa command-instead-of-module
+      register: postfix_omitted_state_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Asserting omitted state defaults to present"
+      ansible.builtin.assert:
+        that:
+          - postfix_omitted_state_check.rc == 0

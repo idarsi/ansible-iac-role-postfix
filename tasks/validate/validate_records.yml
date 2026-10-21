@@ -1,4 +1,58 @@
 ---  # noqa yaml[line-length]
+- name: "Checking Postfix domain record collection types before child validation"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix.virtual_alias_domains | default([]) | type_debug == "list"
+      - iac_blueprint.postfix.virtual_mailbox_domains | default([]) | type_debug == "list"
+    fail_msg: "Postfix virtual_alias_domains and virtual_mailbox_domains must be lists of mappings"
+
+- name: "Checking Postfix domain records are mappings before child validation"
+  ansible.builtin.assert:
+    that:
+      - postfix_domain_record | type_debug == "dict"
+    fail_msg: "Each Postfix virtual alias or mailbox domain record must be a mapping"
+  loop: "{{ (iac_blueprint.postfix.virtual_alias_domains | default([])) + (iac_blueprint.postfix.virtual_mailbox_domains | default([])) }}"
+  loop_control:
+    loop_var: postfix_domain_record
+    label: "{{ postfix_domain_record.name | default('invalid-domain-record') if postfix_domain_record is mapping else 'invalid-domain-record' }}"
+
+- name: "Checking Postfix domain child collections before subelements"
+  ansible.builtin.assert:
+    that:
+      - postfix_domain_record.aliases | default([]) | type_debug == "list"
+      - postfix_domain_record.mailboxes | default([]) | type_debug == "list"
+    fail_msg: "Postfix domain aliases and mailboxes must be lists"
+  loop: "{{ (iac_blueprint.postfix.virtual_alias_domains | default([])) + (iac_blueprint.postfix.virtual_mailbox_domains | default([])) }}"
+  loop_control:
+    loop_var: postfix_domain_record
+    label: "{{ postfix_domain_record.name | default('missing-domain') }}"
+
+- name: "Checking virtual mailbox domain entries"
+  ansible.builtin.assert:
+    that:
+      - item.0.name is defined
+      - item.1.user is defined
+      - item.1.user is string
+      - item.1.user | length > 0
+    fail_msg: "Each virtual mailbox entry must include domain name and mailbox user"
+  loop: "{{ query('subelements', iac_blueprint.postfix.virtual_mailbox_domains | default([]), 'mailboxes', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ (item.1.user | default('missing-user')) ~ '@' ~ (item.0.name | default('missing-domain')) }}"
+
+- name: "Checking explicit virtual mailbox map entries"
+  ansible.builtin.assert:
+    that:
+      - item.address is defined
+      - item.address is string
+      - item.address | length > 0
+      - item.path is defined
+      - item.path is string
+      - item.path | length > 0
+    fail_msg: "Each top-level Postfix virtual mailbox must define string address and path values"
+  loop: "{{ iac_blueprint.postfix.virtual_mailboxes | default([]) }}"
+  loop_control:
+    label: "{{ item.address | default('missing-address') }}"
+
 - name: "Checking Postfix alias record types"
   ansible.builtin.assert:
     that:

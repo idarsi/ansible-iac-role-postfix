@@ -8,9 +8,9 @@
 - name: "Checking Postfix role state"
   ansible.builtin.assert:
     that:
-      - state is defined
-      - state in ["install", "uninstall", "present", "absent", "configuration_present", "virtual_alias_present", "virtual_alias_absent", "virtual_mailbox_present", "virtual_mailbox_absent", "started", "stopped", "restarted", "validate"]  # noqa yaml[line-length]
-    fail_msg: "Unsupported Postfix role state: {{ state | default('undefined') }}"
+      - iac_state is string
+      - iac_state in ["install", "uninstall", "present", "absent", "configuration_present", "virtual_alias_present", "virtual_alias_absent", "virtual_mailbox_present", "virtual_mailbox_absent", "started", "stopped", "restarted", "validate"]  # noqa yaml[line-length]
+    fail_msg: "Unsupported Postfix role state: {{ iac_state | default('undefined') }}"
 
 - name: "Checking Postfix blueprint field types"
   ansible.builtin.assert:
@@ -60,11 +60,11 @@
 - name: "Validating Postfix configuration"
   ansible.builtin.include_tasks: validate_configuration.yml
 
-- name: "Validating Postfix domain child structures"
-  ansible.builtin.include_tasks: validate_domain_children.yml
-
 - name: "Validating Postfix mail records"
   ansible.builtin.include_tasks: validate_records.yml
+
+- name: "Validating Postfix domain child structures"
+  ansible.builtin.include_tasks: validate_domain_children.yml
 
 - name: "Validating Postfix domain records"
   ansible.builtin.include_tasks: validate_domains.yml

@@ -144,29 +144,6 @@
   register: postfix_transport_map
   when: postfix_backup_mx_domains | length > 0
 
-- name: "Checking virtual mailbox domain entries"
-  ansible.builtin.assert:
-    that:
-      - item.0.name is defined
-      - item.1.user is defined
-      - item.1.user | length > 0
-    fail_msg: "Each virtual mailbox entry must include domain name and mailbox user"
-  loop: "{{ query('subelements', postfix_virtual_mailbox_domains, 'mailboxes', {'skip_missing': true}) }}"
-  loop_control:
-    label: "{{ (item.1.user | default('missing-user')) ~ '@' ~ (item.0.name | default('missing-domain')) }}"
-
-- name: "Checking explicit virtual mailbox map entries"
-  ansible.builtin.assert:
-    that:
-      - item.address is defined
-      - item.address | length > 0
-      - item.path is defined
-      - item.path | length > 0
-    fail_msg: "Each postfix.virtual_mailboxes entry must include address and path"
-  loop: "{{ postfix_virtual_mailboxes }}"
-  loop_control:
-    label: "{{ item.address | default('missing-address') }}"
-
 - name: "Initializing Postfix virtual mailbox directory targets"
   ansible.builtin.set_fact:
     postfix_mailbox_directory_targets: []

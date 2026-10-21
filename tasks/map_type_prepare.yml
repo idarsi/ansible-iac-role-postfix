@@ -11,6 +11,8 @@
   ansible.builtin.command:
     cmd: "postconf -m"
   register: postfix_supported_map_types
+  # This read-only capability probe is required to validate configuration in check mode.
+  check_mode: false
   changed_when: false
   failed_when: postfix_supported_map_types.rc != 0
 

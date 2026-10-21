@@ -1,11 +1,5 @@
 > **Maturity State: Beta**<br>
-> **RC Readiness: 77%**
->
-> Assessment: current working tree (uncommitted changes); the executable role has broad
-> blueprint validation, lifecycle guardrails, functional Molecule scenarios,
-> and production-profile CI configuration. RC blockers are unverified CI at
-> this ref, untested claimed RHEL 9/10 support, incomplete role metadata, and
-> limited check-mode/TLS evidence.
+> **RC Readiness: 80%**
 
 ANSIBLE-IAC-ROLE-POSTFIX
 ========================
@@ -56,6 +50,11 @@ Starting Postfix                           | started               |
 Stopping Postfix                           | stopped               |
 Restarting Postfix                         | restarted             |
 
+If `state` is omitted, it defaults to `present`. Both `present` and `install`
+converge the package and configuration; `install` additionally ensures the
+service is started. Every state runs blueprint preflight validation before
+state-specific work.
+
 Requirements
 ------------
 
@@ -64,6 +63,14 @@ Requirements
   - Red Hat Enterprise Linux 10
   - Rocky Linux 9
   - Rocky Linux 10
+
+RHEL 9/10 and Rocky Linux 9/10 are declared in `iac_supported_os`. The
+automated container matrix currently exercises Rocky Linux 9 and 10 only;
+RHEL compatibility is declared but unverified. The shared test environment
+has RHEL DVD media and KVM, but the role has no RHEL VM scenario and guest
+subscription/repository access is not configured. UBI containers are not
+considered RHEL test evidence. See [TESTING.md](TESTING.md) for the matrix and
+RHEL test-environment gap.
 
 - Other components
   - Ansible 2.15 or higher

@@ -50,6 +50,8 @@ jobs:
         scenario:
           - default
           - rocky10
+          - ubi9
+          - ubi10
           - validation
           - lifecycle
           - lmdb
