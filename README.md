@@ -1,5 +1,5 @@
 > **Maturity State: Beta**<br>
-> **RC Readiness: 80%**
+> **RC Readiness: 82%**
 
 ANSIBLE-IAC-ROLE-POSTFIX
 ========================
