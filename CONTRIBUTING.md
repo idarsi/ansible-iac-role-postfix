@@ -97,6 +97,12 @@ molecule syntax -s lmdb
 The default scenario should cover successful input and the resulting host
 state. When adding validation rules, add a focused scenario or converge task
 that demonstrates both accepted input and the expected failure message.
+Keep every blueprint assertion in `tasks/validate/` so invalid input is
+rejected before state-specific host changes. State-dispatch changes should
+cover omitted state (`present`), an unsupported state, and at least one
+representative check-mode or lifecycle transition where applicable. Do not
+describe Rocky or UBI results as RHEL test coverage; RHEL claims require a
+genuine RHEL guest matrix.
 
 Before submitting changes, run the relevant Molecule scenarios and an Ansible
 syntax check from the role directory:

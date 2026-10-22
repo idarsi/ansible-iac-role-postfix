@@ -1,0 +1,25 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: podman
+platforms:
+  - name: instance-idarsi-ubi10
+    image: docker.io/redhat/ubi10-init@sha256:dbb6db10c2cbe88822aa8bd5d36ba0a10c8d82590db1ea6c9924b388d96151b1
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    systemd: "true"
+    tty: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ALLOW_BROKEN_CONDITIONALS: "1"
+    ANSIBLE_ASYNC_DIR: "${MOLECULE_PROJECT_DIRECTORY}/.ansible_async"
+    ANSIBLE_LOCAL_TEMP: "/tmp/.ansible/tmp"
+    ANSIBLE_REMOTE_TMP: "/tmp"
+    ANSIBLE_ROLES_PATH: "${MOLECULE_PROJECT_DIRECTORY}/.."
+verifier:
+  name: ansible

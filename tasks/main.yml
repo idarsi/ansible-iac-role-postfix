@@ -20,10 +20,27 @@
                      | list
                      | length == 0
 
-- name: "Checking if service_key is found from variables"
-  ansible.builtin.fail:
-    msg: "iac_blueprint or iac_blueprint.postfix is not defined"
-  when: iac_blueprint is not defined or iac_blueprint.postfix is not defined
+- name: "Checking Postfix blueprint execution context"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint is defined
+    fail_msg: "iac_blueprint is not defined"
+
+- name: "Checking Postfix blueprint root type"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint | type_debug == "dict"
+    fail_msg: "iac_blueprint must be a mapping containing postfix"
+
+- name: "Checking Postfix service blueprint"
+  ansible.builtin.assert:
+    that:
+      - iac_blueprint.postfix is defined
+    fail_msg: "iac_blueprint.postfix is not defined"
+
+- name: "Normalizing requested IaC state"
+  ansible.builtin.set_fact:
+    iac_state: "{{ state | default('present') }}"
 
 ###############################################################################
 # VALIDATING BLUEPRINT
@@ -40,15 +57,15 @@
   run_once: true
   become: false
   changed_when: false
-  when: state != 'validate'
+  when: iac_state != 'validate'
 
 - name: "Failing when the shared task submodule is missing"
   ansible.builtin.fail:
     msg: >-
       The tasks/shared Git submodule is missing. Initialize the repository with
-      'git submodule update --init --recursive' before running state '{{ state }}'.
+      'git submodule update --init --recursive' before running state '{{ iac_state }}'.
   when:
-    - state != 'validate'
+    - iac_state != 'validate'
     - not postfix_shared_tasks_file.stat.exists
 
 ###############################################################################
@@ -67,7 +84,7 @@
 
 - name: "Checking the selected Postfix map backend before host changes"
   ansible.builtin.include_tasks: map_type_prepare.yml
-  when: state in ["configuration_present", "virtual_alias_present", "virtual_alias_absent", "virtual_mailbox_present", "virtual_mailbox_absent"]
+  when: iac_state in ["configuration_present", "virtual_alias_present", "virtual_alias_absent", "virtual_mailbox_present", "virtual_mailbox_absent"]
 
 - name: "Checking proxy address if it's defined"
   ansible.builtin.set_fact:
@@ -79,7 +96,7 @@
       or (https_proxy is defined and https_proxy != "")
     )
     and (inventory_hostname not in (no_proxy | default("") | split(",")))
-    and state != 'validate'
+    and iac_state != 'validate'
 
 - name: "Checking that proxy connection is working if it's defined"
   ansible.builtin.wait_for:
@@ -93,7 +110,7 @@
       or (https_proxy is defined and https_proxy != "")
     )
     and (inventory_hostname not in (no_proxy | default("") | split(",")))
-    and state != 'validate'
+    and iac_state != 'validate'
 
 ###############################################################################
 # CHECKING STATES
@@ -102,52 +119,52 @@
 - name: "STATE: Validate Postfix blueprint"
   ansible.builtin.debug:
     msg: "Postfix blueprint validation completed successfully"
-  when: state == 'validate'
+  when: iac_state == 'validate'
 
 - name: "STATE: Ensure Postfix installation and configuration is present"
   ansible.builtin.include_tasks: install.yml
-  when: state == 'install'
+  when: iac_state == 'install'
 
 - name: "STATE: Ensure Postfix installation and configuration is absent"
   ansible.builtin.include_tasks: uninstall.yml
-  when: state == 'uninstall'
+  when: iac_state == 'uninstall'
 
 - name: "STATE: Ensure Postfix installation is present"
   ansible.builtin.include_tasks: present.yml
-  when: state == 'present'
+  when: iac_state == 'present'
 
 - name: "STATE: Ensure Postfix installation is absent"
   ansible.builtin.include_tasks: absent.yml
-  when: state == 'absent'
+  when: iac_state == 'absent'
 
 - name: "STATE: Ensure Postfix configuration is present"
   ansible.builtin.include_tasks: configuration_present.yml
-  when: state == 'configuration_present'
+  when: iac_state == 'configuration_present'
 
 - name: "STATE: Ensure Postfix virtual alias entries are present"
   ansible.builtin.include_tasks: virtual_alias_present.yml
-  when: state == 'virtual_alias_present'
+  when: iac_state == 'virtual_alias_present'
 
 - name: "STATE: Ensure Postfix virtual alias entries are absent"
   ansible.builtin.include_tasks: virtual_alias_absent.yml
-  when: state == 'virtual_alias_absent'
+  when: iac_state == 'virtual_alias_absent'
 
 - name: "STATE: Ensure Postfix virtual mailbox entries are present"
   ansible.builtin.include_tasks: virtual_mailbox_present.yml
-  when: state == 'virtual_mailbox_present'
+  when: iac_state == 'virtual_mailbox_present'
 
 - name: "STATE: Ensure Postfix virtual mailbox entries are absent"
   ansible.builtin.include_tasks: virtual_mailbox_absent.yml
-  when: state == 'virtual_mailbox_absent'
+  when: iac_state == 'virtual_mailbox_absent'
 
 - name: "STATE: Ensure Postfix is started"
   ansible.builtin.include_tasks: started.yml
-  when: state == 'started'
+  when: iac_state == 'started'
 
 - name: "STATE: Ensure Postfix is stopped"
   ansible.builtin.include_tasks: stopped.yml
-  when: state == 'stopped'
+  when: iac_state == 'stopped'
 
 - name: "STATE: Ensure Postfix is restarted"
   ansible.builtin.include_tasks: restarted.yml
-  when: state == 'restarted'
+  when: iac_state == 'restarted'

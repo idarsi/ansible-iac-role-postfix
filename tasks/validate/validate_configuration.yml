@@ -64,7 +64,7 @@
     that:
       - postfix_virtual_mailbox_base | regex_replace("/+$", "") not in ["/var", "/home", "/opt"]
     fail_msg: "Targeted mailbox removal cannot use broad base paths /var, /home, or /opt"
-  when: state == "virtual_mailbox_absent"
+  when: iac_state == "virtual_mailbox_absent"
 
 - name: "Checking Postfix extra parameter types"
   ansible.builtin.assert:

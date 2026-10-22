@@ -3,7 +3,7 @@
   hosts: all
   become: false
   tasks:
-    - name: "Checking Postfix package remains absent"
+    - name: "Checking Postfix package was restored by omitted-state recovery"
       ansible.builtin.command: rpm -q postfix
       register: postfix_package_check
       changed_when: false
@@ -12,5 +12,5 @@
     - name: "Verifying final lifecycle state"
       ansible.builtin.assert:
         that:
-          - postfix_package_check.rc != 0
-        fail_msg: "Postfix lifecycle scenario did not finish in absent state"
+          - postfix_package_check.rc == 0
+        fail_msg: "Omitted state did not restore the Postfix package"

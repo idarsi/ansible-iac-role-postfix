@@ -760,3 +760,74 @@
             dest: /tmp/postfix-validation-smtp-tls-loglevel-override.ok
             content: "ok\n"
             mode: "0644"
+
+- name: "Reject an unsupported state"
+  hosts: all
+  become: false
+  vars:
+    state: unsupported
+    iac_blueprint:
+      postfix: {}
+  tasks:
+    - name: "Verify unsupported state is rejected in preflight"
+      block:
+        - name: "Applying unsupported Postfix state"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if unsupported state was accepted"
+          ansible.builtin.fail:
+            msg: "Unsupported Postfix state was accepted"
+      rescue:
+        - name: "Checking unsupported state failure"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg == "Unsupported Postfix role state: unsupported"
+
+- name: "Reject invalid configuration before mutation"
+  hosts: all
+  become: false
+  vars:
+    state: configuration_present
+    iac_blueprint:
+      postfix:
+        virtual_mailboxes:
+          - "malformed mailbox record"
+  tasks:
+    - name: "Capturing Postfix package state before invalid input"
+      ansible.builtin.command: rpm -q postfix  # noqa command-instead-of-module
+      register: postfix_preflight_package_before
+      changed_when: false
+      failed_when: false
+
+    - name: "Capturing Postfix main.cf state before invalid input"
+      ansible.builtin.stat:
+        path: /etc/postfix/main.cf
+      register: postfix_preflight_main_cf_before
+
+    - name: "Verify invalid configuration fails before host mutation"
+      block:
+        - name: "Applying invalid Postfix configuration"
+          ansible.builtin.include_role:
+            name: ansible-iac-role-postfix
+        - name: "Failing if invalid configuration was accepted"
+          ansible.builtin.fail:
+            msg: "Invalid Postfix configuration was accepted"
+      rescue:
+        - name: "Checking invalid record preflight error"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].msg is search("Each top-level Postfix virtual mailbox must define string address and path values")
+        - name: "Checking invalid preflight did not create main.cf"
+          ansible.builtin.stat:
+            path: /etc/postfix/main.cf
+          register: postfix_invalid_preflight_main_cf
+        - name: "Checking invalid preflight did not install Postfix"
+          ansible.builtin.command: rpm -q postfix  # noqa command-instead-of-module
+          register: postfix_invalid_preflight_package
+          changed_when: false
+          failed_when: false
+        - name: "Asserting invalid preflight remained non-mutating"
+          ansible.builtin.assert:
+            that:
+              - postfix_invalid_preflight_main_cf.stat.exists == postfix_preflight_main_cf_before.stat.exists
+              - postfix_invalid_preflight_package.rc == postfix_preflight_package_before.rc

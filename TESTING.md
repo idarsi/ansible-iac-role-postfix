@@ -1,18 +1,24 @@
 # Testing
 
-This role uses Molecule with the Podman driver for integration testing. The
-current scenarios cover the supported RHEL-compatible base images used during
-development.
+This role uses Molecule with the Podman driver for integration testing. Rocky
+Linux images are used for local/CI coverage; they do not constitute RHEL
+testing.
 
 ## Automated test matrix
 
 | Platform/image | Ansible or application versions | Molecule scenarios | Main coverage |
 |---|---|---|---|
-| Rocky Linux 9 UBI | Postfix from image repositories | `default`, `validation`, `lifecycle`, `lmdb`, `mail-flow` | Installation, validation, lifecycle, idempotence, map backends, and SMTP delivery |
-| Rocky Linux 10 UBI | Postfix from image repositories | `rocky10` | Installation and configuration compatibility |
+| Rocky Linux 9 container | Postfix from image repositories | `default`, `validation`, `lifecycle`, `lmdb`, `mail-flow` | Installation, validation, lifecycle, map backends, and SMTP delivery |
+| Rocky Linux 10 container | Postfix from image repositories | `rocky10` | Installation and configuration compatibility |
+| Red Hat UBI 9 init container | Postfix from UBI repositories | `ubi9` | Installation and configuration compatibility |
+| Red Hat UBI 10 init container | Postfix from UBI repositories | `ubi10` | Installation and configuration compatibility |
 
-This is the tested subset. RHEL 9 and 10 are supported but are not currently
-executed by the Molecule matrix.
+RHEL 9 and 10 are declared supported by the role, but are not tested on
+subscribed RHEL hosts. The UBI scenarios use Red Hat's freely redistributable
+UBI container images and UBI repositories. They verify the role against UBI's
+package and systemd environment only; they do not verify full RHEL subscription,
+entitlement, or repository behavior and are not a substitute for an authenticated
+RHEL 9/10 VM matrix.
 
 ## Scenario coverage
 
@@ -24,19 +30,24 @@ executed by the Molecule matrix.
   - backup MX relay domains, recipient maps, and transport maps
   - Postfix map lookups and `postfix check`
   - Maildir directories created through the shared filesystem tasks
-- `molecule/rocky10` runs the same coverage on Rocky Linux 10 UBI.
+- `molecule/rocky10` runs the same coverage on the Rocky Linux 10 init image.
+- `molecule/ubi9` and `molecule/ubi10` run the installation and configuration
+  checks against genuine Red Hat UBI 9 and UBI 10 init images respectively.
 - `molecule/validation` validates a valid blueprint and verifies that domain
   class overlap, incomplete backup MX records, duplicates, malformed records,
   unsafe domains, case-insensitive protected parameters, unsupported backends,
   case-insensitive record/domain identity checks, whitespace-protected keys,
   assignment-syntax extra parameter keys,
-  TLS configuration overrides, and control-character injection fail with explicit messages before any
-  Postfix package or service work is attempted. The valid blueprint also
-  covers successful backup MX validation.
+  TLS configuration overrides, and control-character injection fail with
+  explicit messages before any Postfix package or service work is attempted.
+  Unsupported states and invalid configuration non-mutation are checked too.
+  The valid blueprint also covers successful backup MX validation.
 - `molecule/lifecycle` exercises targeted alias/mailbox states and the
-  started/stopped/restarted/absent/uninstall service lifecycle. It also checks
+  started/stopped/restarted/absent/uninstall service lifecycle, repeated
+  started/stopped transitions, configuration check mode, omitted-state
+  recovery, and preservation of mailbox data through uninstall. It also checks
   mailbox symlink removal refusal and isolation from caller-provided
-  `iac_fs_files` records.
+  `iac_fs_files` records, mailbox creation/removal, and unsafe path rejection.
 - `molecule/lmdb` repeats the default scenario with LMDB map databases.
 - `molecule/mail-flow` uses SMTP against the running Postfix service to verify
   virtual mailbox delivery into Maildir `new/`, virtual alias delivery to the
@@ -66,6 +77,8 @@ Run an individual scenario:
 ```bash
 molecule test -s default
 molecule test -s rocky10
+molecule test -s ubi9
+molecule test -s ubi10
 molecule test -s validation
 molecule test -s lifecycle
 molecule test -s lmdb
@@ -77,6 +90,8 @@ Run only syntax checks while editing task or scenario structure:
 ```bash
 molecule syntax -s default
 molecule syntax -s rocky10
+molecule syntax -s ubi9
+molecule syntax -s ubi10
 molecule syntax -s validation
 molecule syntax -s lifecycle
 molecule syntax -s lmdb
@@ -90,17 +105,24 @@ configuration excludes `molecule/`):
 ansible-lint --profile production molecule/mail-flow/verify.yml molecule/mail-flow/converge.yml
 ```
 
-The scenarios use the `ansible.posix` and `containers.podman` collections for
-test infrastructure. The role itself uses `ansible.builtin.*` modules and its
-`tasks/shared` Git submodule.
+The UBI 9 and UBI 10 init images use fully qualified, immutable Docker Hub
+digest references (`docker.io/redhat/ubi9-init` and
+`docker.io/redhat/ubi10-init`) to avoid Podman's short-name resolution and keep
+scenario base images reproducible; update the digests intentionally when
+refreshing the images. The corresponding UBI AppStream repositories publish
+the `postfix` RPM. The init images use systemd for service management. The scenarios use the
+`ansible.posix` and `containers.podman` collections for test infrastructure.
+The role itself uses `ansible.builtin.*` modules and its `tasks/shared` Git
+submodule.
 
 ## GitHub Actions
 
 The repository workflow at `.github/workflows/tests.yml` runs on pull requests,
 pushes to `main`, and manual dispatches. It performs a production-profile
 `ansible-lint` check and runs every Molecule scenario on an Ubuntu GitHub runner
-with Podman. The workflow checks out `tasks/shared` recursively so the role is
-tested with its pinned shared-task dependency.
+with Podman. Its matrix includes `ubi9` and `ubi10`. The workflow checks out
+`tasks/shared` recursively so the role is tested with its pinned shared-task
+dependency.
 
 Run the production-profile lint check locally before running the Molecule
 scenarios:
