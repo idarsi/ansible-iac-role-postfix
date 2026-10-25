@@ -1,5 +1,5 @@
 > **Maturity State: Beta**<br>
-> **RC Readiness: 82%**
+> **RC Readiness: 80%**
 
 ANSIBLE-IAC-ROLE-POSTFIX
 ========================
@@ -36,19 +36,19 @@ These operations are supported:
 
 Operation                                  | State                 |
 -------------------------------------------|-----------------------|
-Installing, configuring, and starting Postfix | install            |
-Stopping and removing Postfix package      | uninstall             |
-Installing and configuring Postfix         | present               |
-Stopping and removing Postfix package      | absent                |
-Updating Postfix configuration files       | configuration_present |
-Validating the Postfix blueprint            | validate               |
-Ensuring virtual alias targets             | virtual_alias_present |
-Removing virtual alias targets             | virtual_alias_absent  |
-Ensuring virtual mailbox targets           | virtual_mailbox_present |
-Removing virtual mailbox targets           | virtual_mailbox_absent |
-Starting Postfix                           | started               |
-Stopping Postfix                           | stopped               |
-Restarting Postfix                         | restarted             |
+Installing, configuring, and starting Postfix | [install](docs/states/install.md) |
+Stopping and removing Postfix package      | [uninstall](docs/states/uninstall.md) |
+Installing and configuring Postfix         | [present](docs/states/present.md) |
+Stopping and removing Postfix package      | [absent](docs/states/absent.md) |
+Updating Postfix configuration files       | [configuration_present](docs/states/configuration_present.md) |
+Validating the Postfix blueprint            | [validate](docs/states/validate.md) |
+Ensuring virtual alias targets             | [virtual_alias_present](docs/states/virtual_alias_present.md) |
+Removing virtual alias targets             | [virtual_alias_absent](docs/states/virtual_alias_absent.md) |
+Ensuring virtual mailbox targets           | [virtual_mailbox_present](docs/states/virtual_mailbox_present.md) |
+Removing virtual mailbox targets           | [virtual_mailbox_absent](docs/states/virtual_mailbox_absent.md) |
+Starting Postfix                           | [started](docs/states/started.md) |
+Stopping Postfix                           | [stopped](docs/states/stopped.md) |
+Restarting Postfix                         | [restarted](docs/states/restarted.md) |
 
 If `state` is omitted, it defaults to `present`. Both `present` and `install`
 converge the package and configuration; `install` additionally ensures the
