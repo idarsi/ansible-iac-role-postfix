@@ -1,5 +1,51 @@
 > **Maturity State: Beta**<br>
-> **RC Readiness: 80%**
+> **RC Readiness: 83%**<br>
+> **Assessed ref:** `61f07cc5bdf6e32f511e0c4adea76c5fc6f88976` (`main`, 2026-10-31). This score describes that ref and is not a fresh runtime evaluation of the uncommitted assessment-report edits.
+
+## Maturity assessment (2026-10-31)
+
+Assessment at `61f07cc5bdf6e32f511e0c4adea76c5fc6f88976` against the documented
+role contract, using the Idarsi Ansible Role Maturity Assessment rubric. The
+score reflects evidence available at that ref, not a fresh runtime evaluation
+of these uncommitted report edits; it is not production approval.
+
+| Criterion | Score | Evidence summary |
+|---|---:|---|
+| Purpose and boundaries | 2/3 | Purpose and exclusions are stated; ownership/scope can be made more explicit. |
+| Inputs and states | 4/5 | Inputs, defaults and states are documented with validation; some contract details remain distributed across docs. |
+| Support contract | 4/4 | Platforms, dependencies and test limitations are identified; RHEL test gap is disclosed. |
+| Core convergence | 7/8 | Main Postfix/mail-map behaviors have functional scenarios. |
+| Applicable lifecycle | 5/6 | Install, removal, service and resource state transitions are exercised; coverage is not exhaustive. |
+| Platform and dependency handling | 2/3 | Rocky/UBI paths are exercised; subscribed RHEL repository/entitlement behavior is not. |
+| Failure and rerun behavior | 3/3 | Validation failures and repeated transitions/recovery paths have tests. |
+| Preflight validation | 5/6 | Hierarchical validation and invalid-input tests are extensive; not every possible contract edge is evidenced. |
+| Secure behavior | 5/6 | Safe configuration protections and file modes are tested/documented; TLS provisioning and operational security remain outside scope. |
+| Destructive guardrails | 4/5 | Mail-data preservation, path and symlink guardrails are tested; full ownership guarantees are incomplete. |
+| Check and diff behavior | 3/3 | Configuration check mode is tested and lifecycle docs state behavior. |
+| Idempotent convergence | 4/5 | Molecule lifecycle and repeated-run evidence exists; evidence does not span every declared platform. |
+| State transitions | 4/4 | Lifecycle, repeated service operations and data preservation are exercised. |
+| Operational recovery | 3/4 | Handlers and rerun paths are covered, but interrupted-run recovery is not comprehensive. |
+| Static quality checks | 3/3 | Production-profile Ansible Lint is configured and passed at assessed ref. |
+| Input validation tests | 3/4 | Many invalid inputs and non-mutation conditions are covered; not all errors have dedicated assertions. |
+| Functional verification | 5/6 | Observable maps, service and mail flow are checked; RHEL behavior remains untested. |
+| Idempotence tests | 4/4 | Representative repeat/lifecycle coverage is automated. |
+| Lifecycle and guardrail tests | 4/4 | Lifecycle, data preservation and unsafe-path tests are present. |
+| Supported-platform matrix | 1/3 | Rocky and UBI paths pass, but declared RHEL 9/10 lack subscribed-host tests. |
+| CI enforcement | 0/1 | The latest run passed at the assessed ref, but required-check enforcement is not evidenced. Enforcement status is unknown, not confirmed absent; a green run alone does not meet the rubric's enforcement criterion. |
+| Operator documentation | 4/4 | Purpose, states, examples, requirements and safety boundaries are documented. |
+| Test and limitation documentation | 2/2 | Matrix, commands and coverage limitations are current and explicit. |
+| Contribution contract | 1/2 | Contribution and test impact are documented; full change/review workflow is limited. |
+| Repository and release metadata | 1/2 | License and dependencies are coherent; release/version compatibility history is limited. |
+| **RC Readiness** | **83/100** | Rubric category totals: 10/12, 17/20, 17/20, 11/13, 20/25, 8/10 (83/100 overall; floor-rounded to 83%). |
+
+**Score-based state and final state: Beta.** The numeric band is Beta; the
+mandatory cap is also Beta because materially untested RHEL support is declared.
+No production-readiness review is evidenced, so this is not Stable. The
+smallest readiness improvements are to narrow or verify RHEL support, close
+remaining contract/guardrail evidence gaps with repeatable tests, and record
+release/compatibility practices. Detailed evidence and limitations are in
+[`docs/security/osps-assessment.md`](docs/security/osps-assessment.md) for the
+separate OSPS process assessment; that document is not the maturity scorecard.
 
 ANSIBLE-IAC-ROLE-POSTFIX
 ========================
