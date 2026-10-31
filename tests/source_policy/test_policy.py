@@ -40,7 +40,7 @@ class WorkflowPolicyTests(unittest.TestCase):
             parse_workflow(text)
 
     def test_duplicate_yaml_keys_are_rejected(self) -> None:
-        text = (FIXTURES / "duplicate-permissions.yml").read_text(encoding="utf-8")
+        text = (FIXTURES / "duplicate-permissions.yml.fixture").read_text(encoding="utf-8")
         with self.assertRaisesRegex(yaml.YAMLError, "duplicate key"):
             parse_workflow(text)
 
