@@ -1,0 +1,9 @@
+name: Fixture
+"on": pull_request
+permissions:  # noqa: yaml[key-duplicates]
+  contents: read
+permissions: {contents: write}  # noqa: yaml[key-duplicates]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps: []
