@@ -1,0 +1,9 @@
+name: Fixture
+on:
+  pull_request_target:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps: []
+permissions:
+  contents: read

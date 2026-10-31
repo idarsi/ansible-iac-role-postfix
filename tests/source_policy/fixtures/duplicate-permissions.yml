@@ -1,0 +1,10 @@
+name: Fixture
+on: pull_request
+permissions:
+  contents: read
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps: []

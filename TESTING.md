@@ -1,5 +1,17 @@
 # Testing
 
+The `source-checks` job runs `scripts/check_source_policy.py` and the focused
+`unittest` suite. The checker parses workflow YAML with pinned PyYAML 6.0.2,
+checks top-level and any job-level permission declarations independently,
+rejects the sensitive `pull_request_target` and `workflow_run` triggers, and
+checks expected project markers in documentation and MIT license text. Fixtures
+cover a job-level write override, a sensitive trigger, and broad top-level
+permissions. These are source-declaration checks only: they do not calculate
+effective permissions from GitHub administration settings, inspect token use,
+validate the legal status of the license, assess documentation quality, or
+verify runner/secret isolation. The tests use Python's standard-library
+`unittest`; only the checker requires the pinned YAML parser.
+
 This role uses Molecule with the Podman driver for integration testing. Rocky
 Linux images are used for local/CI coverage; they do not constitute RHEL
 testing.

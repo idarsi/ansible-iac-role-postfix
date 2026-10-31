@@ -232,6 +232,22 @@ Statuses follow the pinned skill definition. The full catalog and shared interpr
 - **Evidence:** This bounded workflow exercise inspected the README and selected repository metadata, but did not collect sufficient control-specific evidence to establish operation. Status remains Unverified; this is not a completed baseline assessment.
 - **Necessary remediation:** Complete a control-specific review and obtain current authoritative evidence; remediate only after separate authorization.
 
+## CI automation and evidence limits
+
+The `source-checks` job installs PyYAML 6.0.2 and runs
+`scripts/check_source_policy.py` plus its standard-library `unittest` suite.
+It parses workflow YAML
+and checks declared workflow- and job-level permissions, rejects
+`pull_request_target` and `workflow_run` triggers for explicit review, and
+checks expected project markers in documentation and MIT license text. Its
+fixtures test job permission overrides and sensitive triggers. This is
+source-only evidence: it does not calculate effective GitHub token permissions,
+establish that the license is legally valid, assess documentation quality,
+inspect secrets or token use, verify runner isolation, or establish any
+organization/repository setting. It does not assign or change assessment
+statuses. All controls retain their assessed statuses until sufficient
+control-specific evidence is collected.
+
 ## Outstanding external settings and actions
 
 | Setting/action | Related requirement(s) | Evidence/limitation | Owner or required access | Status/action |
