@@ -20,10 +20,10 @@ testing.
 
 | Platform/image | Ansible or application versions | Molecule scenarios | Main coverage |
 |---|---|---|---|
-| Rocky Linux 9 container | Postfix from image repositories | `default`, `validation`, `lifecycle`, `lmdb`, `mail-flow` | Installation, validation, lifecycle, map backends, and SMTP delivery |
-| Rocky Linux 10 container | Postfix from image repositories | `rocky10` | Installation and configuration compatibility |
-| Red Hat UBI 9 init container | Postfix from UBI repositories | `ubi9` | Installation and configuration compatibility |
-| Red Hat UBI 10 init container | Postfix from UBI repositories | `ubi10` | Installation and configuration compatibility |
+| Rocky Linux 9 container | Postfix from image repositories | `podman-default`, `podman-validation`, `podman-lifecycle`, `podman-lmdb`, `podman-mail-flow` | Installation, validation, lifecycle, map backends, and SMTP delivery |
+| Rocky Linux 10 container | Postfix from image repositories | `podman-rocky10` | Installation and configuration compatibility |
+| Red Hat UBI 9 init container | Postfix from UBI repositories | `podman-ubi9` | Installation and configuration compatibility |
+| Red Hat UBI 10 init container | Postfix from UBI repositories | `podman-ubi10` | Installation and configuration compatibility |
 
 RHEL 9 and 10 are declared supported by the role, but are not tested on
 subscribed RHEL hosts. The UBI scenarios use Red Hat's freely redistributable
@@ -34,7 +34,7 @@ RHEL 9/10 VM matrix.
 
 ## Scenario coverage
 
-- `molecule/default` runs the full Postfix installation and configuration flow
+- `molecule/podman-default` runs the full Postfix installation and configuration flow
   on Rocky Linux 9 UBI. It verifies:
   - package installation and service startup
   - virtual mailbox and alias domains
@@ -42,10 +42,10 @@ RHEL 9/10 VM matrix.
   - backup MX relay domains, recipient maps, and transport maps
   - Postfix map lookups and `postfix check`
   - Maildir directories created through the shared filesystem tasks
-- `molecule/rocky10` runs the same coverage on the Rocky Linux 10 init image.
-- `molecule/ubi9` and `molecule/ubi10` run the installation and configuration
+- `molecule/podman-rocky10` runs the same coverage on the Rocky Linux 10 init image.
+- `molecule/podman-ubi9` and `molecule/podman-ubi10` run the installation and configuration
   checks against genuine Red Hat UBI 9 and UBI 10 init images respectively.
-- `molecule/validation` validates a valid blueprint and verifies that domain
+- `molecule/podman-validation` validates a valid blueprint and verifies that domain
   class overlap, incomplete backup MX records, duplicates, malformed records,
   unsafe domains, case-insensitive protected parameters, unsupported backends,
   case-insensitive record/domain identity checks, whitespace-protected keys,
@@ -54,14 +54,14 @@ RHEL 9/10 VM matrix.
   explicit messages before any Postfix package or service work is attempted.
   Unsupported states and invalid configuration non-mutation are checked too.
   The valid blueprint also covers successful backup MX validation.
-- `molecule/lifecycle` exercises targeted alias/mailbox states and the
+- `molecule/podman-lifecycle` exercises targeted alias/mailbox states and the
   started/stopped/restarted/absent/uninstall service lifecycle, repeated
   started/stopped transitions, configuration check mode, omitted-state
   recovery, and preservation of mailbox data through uninstall. It also checks
   mailbox symlink removal refusal and isolation from caller-provided
   `iac_fs_files` records, mailbox creation/removal, and unsafe path rejection.
-- `molecule/lmdb` repeats the default scenario with LMDB map databases.
-- `molecule/mail-flow` uses SMTP against the running Postfix service to verify
+- `molecule/podman-lmdb` repeats the default scenario with LMDB map databases.
+- `molecule/podman-mail-flow` uses SMTP against the running Postfix service to verify
   virtual mailbox delivery into Maildir `new/`, virtual alias delivery to the
   target mailbox, unknown-recipient rejection, and backup-MX acceptance. The
   checks use `ncat` as an interactive SMTP client: each transaction reads and
@@ -87,34 +87,34 @@ molecule test
 Run an individual scenario:
 
 ```bash
-molecule test -s default
-molecule test -s rocky10
-molecule test -s ubi9
-molecule test -s ubi10
-molecule test -s validation
-molecule test -s lifecycle
-molecule test -s lmdb
-molecule test -s mail-flow
+molecule test -s podman-default
+molecule test -s podman-rocky10
+molecule test -s podman-ubi9
+molecule test -s podman-ubi10
+molecule test -s podman-validation
+molecule test -s podman-lifecycle
+molecule test -s podman-lmdb
+molecule test -s podman-mail-flow
 ```
 
 Run only syntax checks while editing task or scenario structure:
 
 ```bash
-molecule syntax -s default
-molecule syntax -s rocky10
-molecule syntax -s ubi9
-molecule syntax -s ubi10
-molecule syntax -s validation
-molecule syntax -s lifecycle
-molecule syntax -s lmdb
-molecule syntax -s mail-flow
+molecule syntax -s podman-default
+molecule syntax -s podman-rocky10
+molecule syntax -s podman-ubi9
+molecule syntax -s podman-ubi10
+molecule syntax -s podman-validation
+molecule syntax -s podman-lifecycle
+molecule syntax -s podman-lmdb
+molecule syntax -s podman-mail-flow
 ```
 
 Lint the mail-flow playbooks directly (the repository-wide Ansible Lint
 configuration excludes `molecule/`):
 
 ```bash
-ansible-lint --profile production molecule/mail-flow/verify.yml molecule/mail-flow/converge.yml
+ansible-lint --profile production molecule/podman-mail-flow/verify.yml molecule/podman-mail-flow/converge.yml
 ```
 
 The UBI 9 and UBI 10 init images use fully qualified, immutable Docker Hub
@@ -132,7 +132,7 @@ submodule.
 The repository workflow at `.github/workflows/tests.yml` runs on pull requests,
 pushes to `main`, and manual dispatches. It performs a production-profile
 `ansible-lint` check and runs every Molecule scenario on an Ubuntu GitHub runner
-with Podman. Its matrix includes `ubi9` and `ubi10`. The workflow checks out
+with Podman. Its matrix includes `podman-ubi9` and `podman-ubi10`. The workflow checks out
 `tasks/shared` recursively so the role is tested with its pinned shared-task
 dependency.
 
