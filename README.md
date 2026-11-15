@@ -1,5 +1,5 @@
 > **Maturity State: Beta**<br>
-> **RC Readiness: 83%**<br>
+> **RC Readiness: 83%**
 > **Assessed ref:** `61f07cc5bdf6e32f511e0c4adea76c5fc6f88976` (`main`, 2026-10-31). This score describes that ref and is not a fresh runtime evaluation of the uncommitted assessment-report edits.
 
 ## Maturity assessment (2026-10-31)
