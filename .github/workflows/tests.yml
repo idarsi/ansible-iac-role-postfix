@@ -61,7 +61,7 @@ jobs:
       - name: Lint mail-flow Molecule playbooks
         env:
           ANSIBLE_ROLES_PATH: ..
-        run: ansible-lint --profile production molecule/mail-flow/verify.yml molecule/mail-flow/converge.yml
+        run: ansible-lint --profile production molecule/podman-mail-flow/verify.yml molecule/podman-mail-flow/converge.yml
 
   molecule:
     name: Molecule (${{ matrix.scenario }})
@@ -70,14 +70,14 @@ jobs:
       fail-fast: false
       matrix:
         scenario:
-          - default
-          - rocky10
-          - ubi9
-          - ubi10
-          - validation
-          - lifecycle
-          - lmdb
-          - mail-flow
+          - podman-default
+          - podman-rocky10
+          - podman-ubi9
+          - podman-ubi10
+          - podman-validation
+          - podman-lifecycle
+          - podman-lmdb
+          - podman-mail-flow
 
     steps:
       - name: Check out repository

@@ -240,8 +240,8 @@ At assessment time, `gh run list` identified the latest run as **Tests** run
 completed **success** for a `push` to `main` at assessed merge commit
 `61f07cc5bdf6e32f511e0c4adea76c5fc6f88976` (created 2026-10-31 15:46:53Z).
 All listed jobs succeeded: Ansible Lint; source checks; and Molecule matrix
-scenarios `default`, `rocky10`, `ubi9`, `ubi10`, `validation`, `lifecycle`,
-`lmdb`, and `mail-flow`. This is run evidence at the assessed ref, not evidence
+scenarios `podman-default`, `podman-rocky10`, `podman-ubi9`, `podman-ubi10`, `podman-validation`, `podman-lifecycle`,
+`podman-lmdb`, and `podman-mail-flow`. This is run evidence at the assessed ref, not evidence
 of branch-protection/required-check enforcement, private settings, or runtime
 security beyond the job activity/result.
 

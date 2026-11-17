@@ -59,39 +59,39 @@ Run the default scenario after changes that affect normal installation,
 configuration, map generation, or Maildir handling:
 
 ```bash
-molecule test -s default
+molecule test -s podman-default
 ```
 
 Run the Rocky Linux 10 scenario when changing behavior that should work on
 both supported Rocky Linux releases:
 
 ```bash
-molecule test -s rocky10
+molecule test -s podman-rocky10
 ```
 
 Run the validation scenario when changing blueprint validation or state
 dispatch behavior:
 
 ```bash
-molecule test -s validation
+molecule test -s podman-validation
 ```
 
 Run the focused lifecycle and LMDB scenarios when changing state dispatch,
 service handling, or map backend behavior:
 
 ```bash
-molecule test -s lifecycle
-molecule test -s lmdb
+molecule test -s podman-lifecycle
+molecule test -s podman-lmdb
 ```
 
 Run syntax checks while working on task or scenario structure:
 
 ```bash
-molecule syntax -s default
-molecule syntax -s rocky10
-molecule syntax -s validation
-molecule syntax -s lifecycle
-molecule syntax -s lmdb
+molecule syntax -s podman-default
+molecule syntax -s podman-rocky10
+molecule syntax -s podman-validation
+molecule syntax -s podman-lifecycle
+molecule syntax -s podman-lmdb
 ```
 
 The default scenario should cover successful input and the resulting host
